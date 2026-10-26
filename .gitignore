@@ -1,0 +1,11 @@
+.venv*
+.work/
+__pycache__/
+*.pyc
+AGENTS.md
+CLAUDE.md
+.claude/
+exchange/
+briefs/
+.lane-prep
+.mailmap
