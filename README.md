@@ -43,7 +43,7 @@ while True:
 
 ## Install
 
-Mojo 1.1 and MAX 26.6 from `uv sync`; system `libSDL3.so.0` (3.4) and `libfreetype.so.6` (2.14); a TrueType font
+Mojo 1.2 and MAX 26.7 from `uv sync`; system `libSDL3.so.0` (3.4) and `libfreetype.so.6` (2.14); a TrueType font
 (Roboto Medium by default, `IMKIT_FONT` overrides). Use it with `mojo build -I path/to/mojo-imkit/src app.mojo` or
 `mojo precompile src/imkit -o imkit.mojoc`. A headless example: `examples/quickstart.mojo`.
 
