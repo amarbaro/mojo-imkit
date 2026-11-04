@@ -1,4 +1,4 @@
-"""SDL3 window for an app's frames (docs/DESIGN.md): one resizable window, one streaming RGBA texture at the
+"""SDL3 window for an app's frames (docs/design.md): one resizable window, one streaming RGBA texture at the
 render size W x H, letterboxed by SDL (mouse coordinates come back in W x H pixels), vsync. SDL3 is the system library,
 reached through OwnedDLHandle (no binding, no build flag). Event layouts: SDL 3.4 (offsets checked with offsetof).
 

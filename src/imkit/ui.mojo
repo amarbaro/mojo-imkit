@@ -1,4 +1,4 @@
-"""Immediate-mode UI drawn by the GPU (docs/DESIGN.md). Every frame the host calls widgets with this frame's Input;
+"""Immediate-mode UI drawn by the GPU (docs/design.md). Every frame the host calls widgets with this frame's Input;
 each widget returns its interaction (clicked, toggled, dragged) and appends draw commands to one flat list. The list is
 binned into 16 x 16 tiles on the host (one compact list, an offset per tile); `compose` gives every UI pixel one thread that walks only its tile's commands in
 order: anti-aliased rounded rects and soft shadows by SDF, glyphs from font.mojo's atlas, capsule lines, triangles,

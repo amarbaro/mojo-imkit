@@ -1,4 +1,4 @@
-"""imkit: an immediate-mode GUI for Mojo apps, composed on the GPU (docs/DESIGN.md).
+"""imkit: an immediate-mode GUI for Mojo apps, composed on the GPU (docs/design.md).
 
     window   SDL3 window, input, present (system libSDL3 through FFI)
     font     glyph atlas from a TrueType font (system libfreetype through FFI)

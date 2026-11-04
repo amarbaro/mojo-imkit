@@ -1,4 +1,4 @@
-"""GPU side of a Ui (docs/DESIGN.md, Layer): device buffers, the compose launch and the pinned RGBA the window presents,
+"""GPU side of a Ui (docs/design.md, Layer): device buffers, the compose launch and the pinned RGBA the window presents,
 all allocated once on the app's own DeviceContext. render(ui) after ui.finish() uploads only what the frame used
 (n commands, its tile entries, the tile offsets), composes, and copies the layer to `pixels`.
 
