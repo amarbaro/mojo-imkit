@@ -322,14 +322,3 @@ struct Ui(Movable):
                     self.bins[Int(self.cur[t])] = UInt16(k)
                     self.cur[t] += 1
         self.binned = self.n
-
-
-def fmt(v: Float64, d: Int = 2) -> String:
-    """v with d decimals (labels)."""
-    var p = 10 ** d
-    var n = Int(abs(v) * Float64(p) + 0.5)
-    var s = (String("-") if v < 0 and n else String()) + String(n // p)
-    if d:
-        var f = String(n % p)
-        s += "." + String("0") * (d - f.byte_length()) + f
-    return s
