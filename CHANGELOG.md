@@ -2,6 +2,7 @@
 
 Full notes in `docs/releases/`. Newest first. Format: the release-note template.
 
+- [v0.6.2](docs/releases/v0.6.2.md) (2026-11-04): builds on the Mojo 1.3 nightly; conda recipe; ui.fmt removed
 - [v0.6.1](docs/releases/v0.6.1.md) (2026-10-29): builds on the stable Mojo 1.2.0 and MAX 26.7.0 release
 - [v0.6.0](docs/releases/v0.6.0.md) (2026-10-26): Audio stream, public packaging: CI script, CPU Ui test, API page
 - [v0.5.0](docs/releases/v0.5.0.md) (2026-10-09): Window.key_down: keys held between press and release (hold-to-act controls)
