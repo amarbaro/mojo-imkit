@@ -63,7 +63,7 @@ pixels, `window_test` opens a real SDL3 window. Last local run on an RX 7900 XTX
 RX 7900 XTX, 1280 x 720, 150 commands, one run of `ui_test`: compose 25.8 us per launch, render 194 us per frame
 including the 3.7 MB layer copy back. Buffers (allocated once): draw list 128 KB, tile bins 64 KB, atlas 128 KB on the
 card. An earlier run measured compose at 17.7 us; the number moves with GPU clocks and load. Design and budgets:
-[docs/DESIGN.md](docs/DESIGN.md), API: [docs/api.md](docs/api.md).
+[docs/design.md](docs/design.md), API: [docs/api.md](docs/api.md).
 
 ## Limits
 
