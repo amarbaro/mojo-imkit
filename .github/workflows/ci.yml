@@ -9,5 +9,5 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v10.3.0
-      - run: sudo apt-get update -q && sudo apt-get install -yq fonts-dejavu-core
+      - run: sudo apt-get update -q && sudo apt-get install -yq fonts-dejavu-core libfreetype6
       - run: scripts/ci.sh
