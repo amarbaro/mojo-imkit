@@ -31,7 +31,7 @@ struct Font(Movable):
         var face = 0
         var p = path.copy()
         if ft.get_function[Int32]("FT_Init_FreeType")(Pointer(to=lib)) != 0 or \
-           ft.get_function[Int32]("FT_New_Face")(lib, p.as_c_string_span().unsafe_ptr(), Int(0), Pointer(to=face)) != 0:
+           ft.get_function[Int32]("FT_New_Face")(lib, p.as_c_string_span().ptr(), Int(0), Pointer(to=face)) != 0:
             raise Error("FreeType could not open " + path)
         self.atlas = List[UInt8]()
         self.height = 0

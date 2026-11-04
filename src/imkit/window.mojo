@@ -82,7 +82,7 @@ struct Window(Movable):
         var lw, lh = (uw, uh) if uw else (w, h)  # logical size: the UI layer's when there is one
         var scale = max(1, 1280 // lw)  # a small logical size opens at least 1280 wide; SDL scales it
         var t = title.copy()
-        self.win = self.sdl.get_function[Int]("SDL_CreateWindow")(t.as_c_string_slice().unsafe_ptr(), Int32(lw * scale), Int32(lh * scale), UInt64(0x20 | 0x2000))
+        self.win = self.sdl.get_function[Int]("SDL_CreateWindow")(t.as_c_string_span().ptr(), Int32(lw * scale), Int32(lh * scale), UInt64(0x20 | 0x2000))
         self.ren = self.sdl.get_function[Int]("SDL_CreateRenderer")(self.win, Int(0))
         if self.win == 0 or self.ren == 0:
             raise Error("SDL window or renderer failed")

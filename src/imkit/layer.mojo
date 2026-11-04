@@ -13,7 +13,7 @@ from .ui import AH, CW, ISRC, NBIN, NCMD, TX, TY, UH, UW, Ui, compose
 
 
 struct Layer(Movable):
-    var ctx: DeviceContext
+    var ctx: DeviceContext[]
     var img: DeviceBuffer[DType.uint32]
     var cmd: DeviceBuffer[DType.uint32]
     var bins: DeviceBuffer[DType.uint16]
@@ -22,7 +22,7 @@ struct Layer(Movable):
     var src: DeviceBuffer[DType.uint32]  # image sources (Ui.image): the app writes its RGBA here
     var pixels: HostBuffer[DType.uint32]  # the composed layer, valid after render() returns
 
-    def __init__(out self, ctx: DeviceContext, ui: Ui) raises:
+    def __init__(out self, ctx: DeviceContext[], ui: Ui) raises:
         comptime assert UW > 0 and UH > 0 and UW % 16 == 0 and UH % 16 == 0, "UI_W, UI_H: positive multiples of 16"
         if len(ui.font.atlas) > AW * AH:
             raise Error("Layer: font atlas " + String(len(ui.font.atlas)) + " B over the compose capacity " + String(AW * AH))
