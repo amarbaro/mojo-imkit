@@ -15,10 +15,10 @@ FreeType are called through Mojo's FFI.
 
 | module | what it does |
 |---|---|
-| `imkit.window` | SDL3 window, vsync, letterboxed streaming texture; `poll() -> Input` (mouse, wheel, buttons, keys, quit), `present(frame, ui)`, `push()` synthetic events for scripted checks |
-| `imkit.layer` | `Layer(ctx, ui)`: the GPU side on your DeviceContext (buffers, atlas from `ui`, image sources `src`); `render(ui)` after `Ui.finish()` uploads only what the frame used and fills the pinned `pixels` |
+| `imkit.window` | SDL3 window, vsync, letterboxed streaming texture; `poll() -> Input` (mouse, wheel, buttons, keys, typed text, quit), `text_input(on)`, `present(frame, ui)`, `push()` synthetic mouse, key and text events for scripted checks |
+| `imkit.layer` | `Layer(ctx, ui)`: the GPU side on your DeviceContext (buffers, atlas from `ui`, image sources `src`); `render(ui)` after `Ui.finish()` uploads only what the frame used and fills the pinned `pixels`; `set_image(px, w, h)` copies one picture to the image pool (`-DUI_IMG=` sizes it) |
 | `imkit.font` | glyph atlas from a TrueType font (ASCII 32-126, a few pixel sizes, alpha8), built once at start |
-| `imkit.ui` | `Ui`: `begin(input)`, `panel`, `button`, `icon`, `bar`, `spark`, `text`, `rect`, `line`, `tri`, `image`, `finish()`; the `compose` kernel; a dark theme |
+| `imkit.ui` | `Ui`: `begin(input)`, `panel`, `button`, `icon`, `bar`, `spark`, `text`, `field` (single-line text box), `rect`, `line`, `tri`, `image`, `finish()`; the `compose` kernel; a dark theme |
 
 ## Use
 
@@ -54,7 +54,8 @@ Mojo 1.2 and MAX 26.7 from `uv sync`; system `libSDL3.so.0` (3.4) and `libfreety
 ## Verified
 
 `scripts/ci.sh` (no GPU, no display): precompile, build of every test, `font_test` (glyph atlas), `ui_cpu_test` (click =
-press then release, tile bins, overflow drops counted; a mutant of the click rule fails it) and the quickstart.
+press then release, tile bins, overflow drops counted, text fields, image fit; a mutant of the click rule fails it) and the quickstart.
+`scripts/mutants.sh` breaks the field maximum and the text join of `Input.merge` in a copy of `src`; each must fail its test.
 `scripts/local_gate.sh` (run locally, GitHub runners have no GPU or display): `ui_test` composes on the GPU and checks
 pixels, `window_test` opens a real SDL3 window. Last local run on an RX 7900 XTX (gfx1100), KDE Wayland: `PASS ui_test`.
 
@@ -67,7 +68,7 @@ card. An earlier run measured compose at 17.7 us; the number moves with GPU cloc
 
 ## Limits
 
-- ASCII text only, no shaping; no docking, axes plots, sliders, text input, menus or DPI scaling.
+- ASCII text only, no shaping; no docking, axes plots, sliders, menus or DPI scaling. `Ui.field` is one ASCII line (append, Backspace; no cursor movement, selection, paste or key repeat).
 - Needs a GPU MAX supports for `Layer`; only gfx1100 was tested. Struct offsets are those of SDL 3.4 and FreeType 2.14.
 - Key scancodes below 128 only. `Audio` (mono float playback) has no automated check.
 - CI covers the CPU side only; the compose kernel and the window are checked locally.

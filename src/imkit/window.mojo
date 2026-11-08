@@ -12,6 +12,7 @@ comptime EV_QUIT = 0x100
 comptime EV_CLOSE = 0x210
 comptime EV_KEY_DOWN = 0x300
 comptime EV_KEY_UP = 0x301
+comptime EV_TEXT = 0x303
 comptime EV_MOTION = 0x400
 comptime EV_BUTTON_DOWN = 0x401
 comptime EV_BUTTON_UP = 0x402
@@ -19,10 +20,9 @@ comptime EV_WHEEL = 0x403
 comptime SCRIPT_MOUSE = 0x5C819700  # `which` of push()ed mouse events: SDL gives a real mouse 0 (non-relative mode), touch and pen their own ids
 
 
-@fieldwise_init
 struct Input(Copyable, Movable):
     """One frame's input, in render pixels. Mouse buttons are bits (left 1, middle 2, right 4); keys are SDL scancodes
-    below 128 as bits of two words (pressed: went down this frame)."""
+    below 128 as bits of two words (pressed: went down this frame); text is what the user typed (layout-aware, UTF-8)."""
     var x: Float32
     var y: Float32
     var dx: Float32
@@ -33,6 +33,12 @@ struct Input(Copyable, Movable):
     var released: UInt32
     var keys: SIMD[DType.uint64, 2]
     var quit: Bool
+    var text: String  # typed text this frame (SDL text input, after text_input(True)); merge() joins it
+
+    def __init__(out self, x: Float32, y: Float32, dx: Float32, dy: Float32, wheel: Float32, down: UInt32, pressed: UInt32,
+                 released: UInt32, keys: SIMD[DType.uint64, 2], quit: Bool, text: String = ""):
+        self.x, self.y, self.dx, self.dy, self.wheel, self.down, self.pressed, self.released = x, y, dx, dy, wheel, down, pressed, released
+        self.keys, self.quit, self.text = keys, quit, text.copy()
 
     def merge(mut self, o: Input):
         """Fold a later frame's input in: newest position and buttons held, presses / releases / keys OR'd, motion and
@@ -45,6 +51,7 @@ struct Input(Copyable, Movable):
         self.released |= o.released
         self.keys |= o.keys
         self.quit = self.quit or o.quit
+        self.text += o.text
 
     def key(self, scancode: Int) -> Bool:
         return (self.keys[scancode >> 6] >> UInt64(scancode & 63)) & 1 == 1
@@ -70,6 +77,7 @@ struct Window(Movable):
     var y: Float32
     var down: UInt32
     var held: SIMD[DType.uint64, 2]  # keys down now (scancodes < 128): key_down(); press / release events keep it
+    var keep: List[List[UInt8]]  # text of push()ed EV_TEXT events, alive until the next poll() has read them
     var scripted: Bool  # True: only push()ed mouse events count (which = SCRIPT_MOUSE); a real mouse is ignored (scripted checks)
 
     def __init__(out self, title: String, w: Int, h: Int, uw: Int = 0, uh: Int = 0) raises:
@@ -77,6 +85,7 @@ struct Window(Movable):
         self.w, self.h, self.x, self.y, self.down, self.scripted = w, h, 0, 0, 0, False
         self.held = SIMD[DType.uint64, 2](0)
         self.ev = List[UInt8](length=128, fill=0)
+        self.keep = List[List[UInt8]]()
         if not self.sdl.get_function[Bool]("SDL_Init")(UInt32(0x20)):  # SDL_INIT_VIDEO
             raise Error("SDL_Init failed")
         var lw, lh = (uw, uh) if uw else (w, h)  # logical size: the UI layer's when there is one
@@ -124,6 +133,10 @@ struct Window(Movable):
                     inp.released |= bit
             elif kind == EV_WHEEL:
                 inp.wheel += f[7]
+            elif kind == EV_TEXT:  # SDL_TextInputEvent: the char* at offset 24, owned by SDL until the next poll
+                var p = UnsafePointer[UInt8, MutAnyOrigin](unsafe_from_address=e.unsafe_bitcast[Int]()[3])
+                var n = Int(external_call["strlen", UInt64](p))
+                inp.text += String(unsafe_from_utf8=Span(unsafe_ptr=p, length=n))
             elif kind == EV_KEY_DOWN or kind == EV_KEY_UP:
                 var sc = Int(e.unsafe_bitcast[UInt32]()[6])
                 if sc < 128:
@@ -134,11 +147,19 @@ struct Window(Movable):
                         inp.keys[sc >> 6] |= bit
                         self.held[sc >> 6] |= bit
         self.x, self.y, self.down = inp.x, inp.y, inp.down
+        self.keep.clear()
         return inp^
 
     def key_down(self, scancode: Int) -> Bool:
         """Is the key held now (between its press and release events)?"""
         return scancode < 128 and (self.held[scancode >> 6] >> UInt64(scancode & 63)) & 1 == 1
+
+    def text_input(mut self, on: Bool) raises:
+        """Start or stop SDL text events (Input.text); keys keep arriving either way. Off when no text field has focus."""
+        if on:
+            _ = self.sdl.get_function[Bool]("SDL_StartTextInput")(self.win)
+        else:
+            _ = self.sdl.get_function[Bool]("SDL_StopTextInput")(self.win)
 
     def present(mut self, pixels: Int, ui: Int = 0) raises:
         """Show a W x H RGBA frame and, with a layer, the UW x UH UI over it (host memory, row-major, 4 bytes per pixel)."""
@@ -150,9 +171,9 @@ struct Window(Movable):
             _ = self.sdl.get_function[Bool]("SDL_RenderTexture")(self.ren, self.utex, Int(0), Int(0))
         _ = self.sdl.get_function[Bool]("SDL_RenderPresent")(self.ren)
 
-    def push(mut self, kind: Int, a: Int = 0, x: Float32 = 0, y: Float32 = 0, rx: Float32 = 0, ry: Float32 = 0, which: Int = SCRIPT_MOUSE) raises:
+    def push(mut self, kind: Int, a: Int = 0, x: Float32 = 0, y: Float32 = 0, rx: Float32 = 0, ry: Float32 = 0, which: Int = SCRIPT_MOUSE, text: String = "") raises:
         """Queue a synthetic event (tests, scripted checks): motion (x, y, rx, ry), button a down/up at (x, y), wheel
-        (x = amount), key a (scancode) down or up. Mouse events carry `which` (SCRIPT_MOUSE; 0 looks like a real mouse)."""
+        (x = amount), key a (scancode) down or up, EV_TEXT with `text`. Mouse events carry `which` (SCRIPT_MOUSE; 0 looks like a real mouse)."""
         for k in range(128):
             self.ev[k] = 0
         var e = self.ev.unsafe_ptr()
@@ -169,6 +190,11 @@ struct Window(Movable):
         elif kind == EV_KEY_DOWN or kind == EV_KEY_UP:
             e.unsafe_bitcast[UInt32]()[6] = UInt32(a)
             e[36] = 1 if kind == EV_KEY_DOWN else 0
+        elif kind == EV_TEXT:
+            var buf = List[UInt8](text.as_bytes())
+            buf.append(0)
+            self.keep.append(buf^)  # SDL holds this pointer until the event is polled, so the bytes live until poll() returns
+            e.unsafe_bitcast[Int]()[3] = Int(self.keep[len(self.keep) - 1].unsafe_ptr())
         _ = self.sdl.get_function[Bool]("SDL_PushEvent")(e)
 
     def close(mut self) raises:

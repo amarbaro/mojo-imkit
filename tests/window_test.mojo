@@ -5,7 +5,7 @@ real mouse) between a scripted press and release is ignored; the frame rate show
 usage: mojo run -I src tests/window_test.mojo
 """
 from std.time import perf_counter_ns
-from imkit.window import EV_BUTTON_DOWN, EV_BUTTON_UP, EV_KEY_DOWN, EV_KEY_UP, EV_MOTION, EV_QUIT, EV_WHEEL, Window
+from imkit.window import EV_BUTTON_DOWN, EV_BUTTON_UP, EV_KEY_DOWN, EV_KEY_UP, EV_MOTION, EV_QUIT, EV_TEXT, EV_WHEEL, Input, Window
 
 
 def check(ok: Bool, name: String, mut fails: Int):
@@ -54,6 +54,23 @@ def main() raises:
     win.push(EV_KEY_UP, 26)
     _ = win.poll()
     check(not win.key_down(26) and not win.key_down(4), "key W released, A never down", fails)
+    win.text_input(True)  # typed text: two pushed text events in one frame are joined, a key event rides along
+    win.push(EV_TEXT, text="hi ")
+    win.push(EV_KEY_DOWN, 42)  # Backspace
+    win.push(EV_TEXT, text="you")
+    var t1 = win.poll()
+    check(t1.text == "hi you" and t1.key(42), "pushed text arrives joined, pushed key arrives", fails)
+    check(win.poll().text == "", "text does not carry into the next frame", fails)
+    var typed = String("text extra finger")  # a runtime string, not a literal: its bytes must outlive push() until poll()
+    win.push(EV_TEXT, text=String(typed[byte=5:]))
+    check(win.poll().text == "extra finger", "pushed runtime text equals polled text", fails)
+    win.push(EV_KEY_UP, 42)
+    _ = win.poll()
+    win.text_input(False)
+    var m = Input(1, 2, 0, 0, 0, 0, 0, 0, SIMD[DType.uint64, 2](0), False, "ab")  # merge: text joined in order
+    m.merge(Input(3, 4, 0, 0, 0, 0, 0, 0, SIMD[DType.uint64, 2](0), False, "cd"))
+    m.merge(Input(3, 4, 0, 0, 0, 0, 0, 0, SIMD[DType.uint64, 2](0), False))
+    check(m.text == "abcd" and m.x == 3, "Input.merge joins text, newest position", fails)
     win.push(EV_QUIT)
     check(win.poll().quit, "quit", fails)
     print("frames: 120 at", fps, "fps (vsync caps it at the display rate)")

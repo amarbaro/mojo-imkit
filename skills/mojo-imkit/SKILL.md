@@ -18,3 +18,12 @@ Per frame: `inp = win.poll()`, `ui.begin(inp)`, widgets (`ui.panel`, `ui.icon`, 
 - Capacities overflow by dropping whole commands, counted in `ui.dropped`; assert it is 0.
 - No allocation between `begin` and `finish`. One kernel, one 8-word command layout.
 - ASCII only; scancodes below 128.
+
+## Large image
+Build with `-DUI_IMG=<pixels>` (default 65,536; a 2560 x 1440 window view is 3,686,400). Per picture: scale or crop to the view on
+the CPU into a `List[UInt32]` (packed `r | g << 8 | b << 16 | a << 24`), `layer.set_image(Span(px), w, h)` (raises if
+`w * h > UI_IMG`), then each frame `ui.image(x0, y0, x1, y1, 0, w, h)`. Re-upload only when the picture or the crop changes.
+
+## Typing
+`win.text_input(True)` while a field is on screen (off after), `ui.field(id, buf, max)` each frame, and send keys to the field
+instead of shortcuts while `ui.field_focused`. Enter and Esc are yours: `field` only edits `buf`. Scripted: `win.push(EV_TEXT, text="ab")`.
