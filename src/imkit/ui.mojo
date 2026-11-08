@@ -51,6 +51,7 @@ comptime BAD = rgba(248, 113, 113, 255)
 comptime TEXT = rgba(229, 231, 235, 255)
 comptime MUTED = rgba(148, 155, 172, 255)
 comptime SHADOW = rgba(0, 0, 0, 120)
+comptime SC_BACKSPACE = 42  # SDL scancode
 
 
 def rgba(r: Int, g: Int, b: Int, a: Int) -> UInt32:
@@ -152,6 +153,8 @@ struct Ui(Movable):
     var over: Bool  # the mouse is over UI this frame: the scene does not take it
     var x: Float32  # layout cursor
     var y: Float32
+    var focus: Int  # id of the text field that takes typing (0: none yet; the first field drawn takes it)
+    var field_focused: Bool  # a field drawn this frame has focus: the app sends keys to typing, not to shortcuts
 
     def __init__(out self, var font: Font):
         self.font = font^
@@ -161,6 +164,7 @@ struct Ui(Movable):
         self.cur = List[UInt32](length=TX * TY, fill=0)
         self.binned = 0
         self.n, self.dropped, self.active, self.over, self.x, self.y = 0, 0, 0, False, 0, 0
+        self.focus, self.field_focused = 0, False
         self.inp = Input(0, 0, 0, 0, 0, 0, 0, 0, SIMD[DType.uint64, 2](0), False)
 
     def begin(mut self, inp: Input):
@@ -168,6 +172,7 @@ struct Ui(Movable):
         self.n = 0
         self.binned = -1
         self.over = False
+        self.field_focused = False
 
     def push(mut self, kind: Int, x0: Float32, y0: Float32, x1: Float32, y1: Float32, r: Float32, c: UInt32, aux: UInt32 = 0):
         if self.n == NCMD:
@@ -229,15 +234,47 @@ struct Ui(Movable):
             self.over = True
         self.x, self.y = x0 + 16, y0 + 40
 
-    def button(mut self, id: Int, label: StringSlice, w: Float32, h: Float32 = 30, on: Bool = False) -> Bool:
-        """Pill button at the cursor (also a toggle: on = filled with the accent); returns clicked."""
+    def button(mut self, id: Int, label: StringSlice, w: Float32, h: Float32 = 30, on: Bool = False, color: UInt32 = ACCENT) -> Bool:
+        """Pill button at the cursor (also a toggle: on = filled with `color`, the accent by default); returns clicked."""
         var x0, y0 = self.x, self.y
         var hc = self.clickable(id, x0, y0, x0 + w, y0 + h)
-        self.rect(x0, y0, x0 + w, y0 + h, h * 0.5, ACCENT if on else (HOVER if hc[0] else SURFACE))
+        self.rect(x0, y0, x0 + w, y0 + h, h * 0.5, color if on else (HOVER if hc[0] else SURFACE))
         var tw = Float32(self.font.width(label, 0))
         _ = self.text(x0 + (w - tw) * 0.5, y0 + (h - Float32(self.font.ascent[0])) * 0.5 - 1, label, 0, TEXT)
         self.x += w + 8
         return hc[1]
+
+    def field(mut self, id: Int, mut buf: String, max: Int) -> Bool:
+        """Single-line text box (360 x 30) at the cursor; next row. A click gives it focus, and so does the first field drawn
+        while none has it. The focused field appends the ASCII 32-126 of this frame's Input.text up to `max` bytes, then
+        removes the last byte on Backspace; a long text shows its tail. Returns True if buf changed."""
+        var x0, y0, w = self.x, self.y, Float32(360)
+        var hc = self.clickable(id, x0, y0, x0 + w, y0 + 30)
+        if hc[1] or self.focus == 0:
+            self.focus = id
+        var on = self.focus == id
+        var changed = False
+        if on:
+            self.field_focused = True
+            for b in self.inp.text.as_bytes():
+                if 32 <= Int(b) <= 126 and buf.byte_length() < max:
+                    buf += chr(Int(b))
+                    changed = True
+            if self.inp.key(SC_BACKSPACE) and buf.byte_length() > 0:
+                var keep = buf.byte_length() - 1
+                var cut = String(unsafe_from_utf8=buf.as_bytes()[:keep])
+                buf = cut^
+                changed = True
+        self.rect(x0 - 1.5, y0 - 1.5, x0 + w + 1.5, y0 + 31.5, 8, ACCENT if on else SURFACE)
+        self.rect(x0, y0, x0 + w, y0 + 30, 7, HOVER if hc[0] and not on else SURFACE)
+        var s = 0
+        while s < buf.byte_length() and self.font.width(StringSlice(unsafe_from_utf8=buf.as_bytes()[s:]), 0) > Int(w) - 24:
+            s += 1
+        var pen = self.text(x0 + 10, y0 + (30 - Float32(self.font.ascent[0])) * 0.5 - 1, StringSlice(unsafe_from_utf8=buf.as_bytes()[s:]), 0, TEXT)
+        if on:
+            self.rect(pen + 1, y0 + 7, pen + 2.5, y0 + 23, 0.5, TEXT)
+        self.y += 38
+        return changed
 
     def icon(mut self, id: Int, kind: Int, on: Bool = False) -> Bool:
         """Round icon button at the cursor: 0 play, 1 pause, 2 step, 3 stop; returns clicked."""

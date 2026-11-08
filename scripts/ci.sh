@@ -6,7 +6,11 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 command -v uv >/dev/null || { echo "FAIL setup: uv not installed"; exit 1; }
-uv sync || { echo "FAIL setup: uv sync"; exit 1; }
+if [ -z "${MOJO:-}" ]; then
+  uv sync || { echo "FAIL setup: uv sync"; exit 1; }
+  MOJO=.venv/bin/mojo
+fi
+export MOJO
 # a TrueType font for the font and Ui checks: IMKIT_FONT, else the first of a few common locations
 if [ -z "${IMKIT_FONT:-}" ]; then
   for f in /usr/share/fonts/TTF/Roboto-Medium.ttf /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf /usr/share/fonts/TTF/DejaVuSans.ttf \
@@ -18,7 +22,7 @@ fi
 export IMKIT_FONT
 echo "font $IMKIT_FONT"
 mkdir -p .work
-M=.venv/bin/mojo
+M=$MOJO
 $M precompile src/imkit -o .work/imkit.mojoc 2>.work/build.err || { echo "FAIL precompile: src/imkit"; grep error .work/build.err | head -20; exit 1; }
 # every test and the example build, including the three that need a GPU, a display or libSDL3 to run
 for t in tests/font_test tests/ui_cpu_test tests/ui_test tests/window_test tests/audio_test examples/quickstart; do

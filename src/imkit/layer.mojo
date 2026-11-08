@@ -12,6 +12,11 @@ from .font import AW
 from .ui import AH, CW, ISRC, NBIN, NCMD, TX, TY, UH, UW, Ui, compose
 
 
+def image_fits(n: Int, w: Int, h: Int) -> Bool:
+    """Can a w x h picture held in n pixels go to the ISRC pool (Ui.image takes sides up to 0xFFFF)?"""
+    return 0 < w <= 0xFFFF and 0 < h <= 0xFFFF and w * h <= ISRC and n >= w * h
+
+
 struct Layer(Movable):
     var ctx: DeviceContext[]
     var img: DeviceBuffer[DType.uint32]
@@ -37,6 +42,14 @@ struct Layer(Movable):
         self.src.enqueue_fill(0)
         ctx.enqueue_copy(self.atlas.create_sub_buffer[DType.uint8](0, len(ui.font.atlas)), ui.font.atlas.unsafe_ptr())
         ctx.synchronize()  # the atlas is the caller's
+
+    def set_image(mut self, px: Span[UInt32, _], w: Int, h: Int) raises:
+        """Copy a w x h picture (packed r | g << 8 | b << 16 | a << 24, row-major) to pool offset 0 and wait; draw it with
+        Ui.image(.., 0, w, h). ISRC is the pool size in pixels, set by -DUI_IMG=; a picture over it raises, the pool is untouched."""
+        if not image_fits(len(px), w, h):
+            raise Error("Layer.set_image: " + String(w) + " x " + String(h) + " (" + String(len(px)) + " px given) does not fit ISRC " + String(ISRC))
+        self.ctx.enqueue_copy(self.src.create_sub_buffer[DType.uint32](0, w * h), px.unsafe_ptr())
+        self.ctx.synchronize()  # px is the caller's
 
     def launch(self) raises:
         """Compose what was last uploaded (enqueue only; render() does the whole frame)."""

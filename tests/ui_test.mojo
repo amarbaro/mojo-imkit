@@ -133,6 +133,22 @@ def main() raises:
     print("image: top-left", hex(tl), "bottom-right", hex(br), "dropped", dropped0)
     if not near(tl, srcpx[0]) or not near(br, srcpx[15]) or not near(mid, srcpx[6]) or layer.pixels[409 * UW + 209] != 0 or dropped0 != 1:
         fails += 1
+    # set_image: a 4 x 4 picture to pool offset 0, drawn 2x oversize (clipped by the layer edge); one over ISRC raises, pool untouched
+    var big = List[UInt32](length=ISRC + 1, fill=0)
+    layer.set_image(Span(srcpx), 4, 4)
+    ui.begin(idle)
+    ui.image(-8, -8, 8, 8, 0, 4, 4)  # source (2, 2) lands at the layer's (0, 0)
+    ui.finish()
+    layer.render(ui)
+    var si = layer.pixels[0]
+    var si_raised = False
+    try:
+        layer.set_image(Span(big), ISRC + 1, 1)
+    except:
+        si_raised = True
+    print("set_image: pixel (0, 0)", hex(si), "raised over ISRC", si_raised)
+    if not near(si, srcpx[10]) or not si_raised or layer.pixels[1] >> 24 != 255:
+        fails += 1
     # past NBIN tile entries: whole commands drop (counted), the ones kept still draw
     ui.dropped = 0
     ui.begin(idle)
