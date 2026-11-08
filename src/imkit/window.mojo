@@ -60,7 +60,7 @@ struct Input(Copyable, Movable):
 def readable(fd: Int, ms: Int) -> Bool:
     """poll(2) one fd for input for up to ms milliseconds."""
     var pfd = SIMD[DType.int32, 2](Int32(fd), 1)  # struct pollfd: fd, events POLLIN (revents in the high half)
-    return external_call["poll", Int32](UnsafePointer(to=pfd), UInt64(1), Int32(ms)) > 0
+    return external_call["poll", Int32](Pointer(to=pfd), UInt64(1), Int32(ms)) > 0
 
 
 struct Window(Movable):
@@ -134,7 +134,7 @@ struct Window(Movable):
             elif kind == EV_WHEEL:
                 inp.wheel += f[7]
             elif kind == EV_TEXT:  # SDL_TextInputEvent: the char* at offset 24, owned by SDL until the next poll
-                var p = UnsafePointer[UInt8, MutAnyOrigin](unsafe_from_address=e.unsafe_bitcast[Int]()[3])
+                var p = Pointer[UInt8, MutAnyOrigin](unsafe_from_address=e.unsafe_bitcast[Int]()[3])
                 var n = Int(external_call["strlen", UInt64](p))
                 inp.text += String(unsafe_from_utf8=Span(unsafe_ptr=p, length=n))
             elif kind == EV_KEY_DOWN or kind == EV_KEY_UP:
