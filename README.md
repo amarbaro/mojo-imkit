@@ -10,6 +10,9 @@ widgets append to one flat draw list, one `compose` kernel turns that list into 
 the layer over the app's picture. No Python UI process, no C++ library, no bundled windowing: the system's SDL3 and
 FreeType are called through Mojo's FFI.
 
+Install: `pixi workspace channel add https://conda.modular.com/max https://prefix.dev/amarbaro/amarbaro`, then `pixi add mojo-imkit` (import `imkit`). From source: `git clone https://github.com/amarbaro/mojo-imkit`, then `mojo run -I mojo-imkit/src app.mojo`.
+Toolchains: Mojo 1.2 stable, and the nightly 1.3.0.dev2026110805 in the weekly [mojo-libs](https://github.com/amarbaro/mojo-libs) matrix (36 libraries on stable, 35 on nightly).
+
 
 ## Modules
 
@@ -23,26 +26,36 @@ FreeType are called through Mojo's FFI.
 ## Use
 
 ```mojo
-from imkit.window import Window
-from imkit.font import Font
-from imkit.layer import Layer
-from imkit import ui as im
-from max.gpu.host import DeviceContext
+"""A headless frame: widgets with a scripted click, no window and no GPU. Prints what the frame produced.
 
-var win = Window("App", W, H, im.UW, im.UH)          # W x H: your frame; UW x UH: the UI layer
-var u = im.Ui(Font("/usr/share/fonts/TTF/Roboto-Medium.ttf", [13, 16, 22]))
-var layer = Layer(DeviceContext(), u)                # once, on your app's context: buffers, the atlas from u
-while True:
-    var inp = win.poll()
-    if inp.quit:
-        break
-    u.begin(inp)
-    u.panel(20, 16, 400, 92, "Run")
-    if u.icon(1, 1):                                  # 0 play, 1 pause, 2 step, 3 stop
-        pause()
-    u.finish()                                        # bins the commands into 16 x 16 tiles
-    layer.render(u)                                   # uploads what the frame used, composes, copies back; synchronizes
-    win.present(frame_ptr, Int(layer.pixels.unsafe_ptr()))
+usage: IMKIT_FONT=/path/font.ttf mojo run -I src examples/quickstart.mojo  (default font: Roboto Medium)
+"""
+from std.os import getenv
+from imkit.font import Font
+from imkit.ui import TX, TY, Ui
+from imkit.window import Input
+
+
+def frame(mut ui: Ui, inp: Input) -> Bool:
+    ui.begin(inp)
+    ui.panel(20, 16, 300, 100, "Run")
+    var clicked = ui.icon(1, 1)  # 0 play, 1 pause, 2 step, 3 stop
+    ui.finish()  # bins the commands into 16 x 16 tiles for the compose kernel
+    return clicked
+
+
+def main() raises:
+    var ui = Ui(Font(getenv("IMKIT_FONT", "/usr/share/fonts/TTF/Roboto-Medium.ttf"), [13, 16, 22]))
+    var keys = SIMD[DType.uint64, 2](0)
+    # the pause icon sits at (36, 56) to (72, 92): press and release on it
+    var press = Input(50, 70, 0, 0, 0, 1, 1, 0, keys, False)
+    var release = Input(50, 70, 0, 0, 0, 0, 0, 1, keys, False)
+    var before = frame(ui, press)
+    var clicked = frame(ui, release)
+    print("click after press:", before, "after release:", clicked)
+    print("commands:", ui.n, "tile entries:", Int(ui.off[TX * TY]), "dropped:", ui.dropped)
+    if before or not clicked or ui.dropped != 0 or ui.n == 0:
+        raise Error("quickstart: the click or the draw list is wrong")
 ```
 
 ## Install
