@@ -7,11 +7,12 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 mkdir -p .work
-for t in ui_test window_test audio_test; do
+for t in anim_test ui_test window_test audio_test; do
   .venv/bin/mojo build -I src "tests/$t.mojo" -o ".work/$t" > ".work/$t.build.log" 2>&1 || { echo "FAIL build $t: .work/$t.build.log"; exit 1; }
 done
+.work/anim_test || { echo "FAIL anim_test: spring table"; exit 1; }
 # shellcheck disable=SC2086
 ${GPU_WRAP:-} .work/ui_test || { echo "FAIL ui_test: compose on the GPU"; exit 1; }
 .work/window_test || { echo "FAIL window_test: SDL3 window"; exit 1; }
 SDL_AUDIODRIVER=dummy .work/audio_test || { echo "FAIL audio_test: SDL3 audio stream"; exit 1; }
-echo "PASS local_gate: ui_test, window_test, audio_test"
+echo "PASS local_gate: anim_test, ui_test, window_test, audio_test"

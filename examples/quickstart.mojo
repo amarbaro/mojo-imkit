@@ -4,7 +4,8 @@ usage: IMKIT_FONT=/path/font.ttf mojo run -I src examples/quickstart.mojo  (defa
 """
 from std.os import getenv
 from imkit.font import Font
-from imkit.ui import TX, TY, Ui
+from imkit.draw import TX, TY
+from imkit.ui import Ui
 from imkit.window import Input
 
 
@@ -25,6 +26,6 @@ def main() raises:
     var before = frame(ui, press)
     var clicked = frame(ui, release)
     print("click after press:", before, "after release:", clicked)
-    print("commands:", ui.n, "tile entries:", Int(ui.off[TX * TY]), "dropped:", ui.dropped)
-    if before or not clicked or ui.dropped != 0 or ui.n == 0:
+    print("commands:", ui.d.n, "tile entries:", Int(ui.d.off[TX * TY]), "dropped:", ui.d.dropped)
+    if before or not clicked or ui.d.dropped != 0 or ui.d.n == 0:
         raise Error("quickstart: the click or the draw list is wrong")

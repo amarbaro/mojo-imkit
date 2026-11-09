@@ -56,6 +56,13 @@ struct Input(Copyable, Movable):
     def key(self, scancode: Int) -> Bool:
         return (self.keys[scancode >> 6] >> UInt64(scancode & 63)) & 1 == 1
 
+    def logical(self, scale: Float32) -> Input:
+        """The same input with the mouse in logical units: a UI drawn at `scale` layer pixels per logical unit (DPI 1.5: 1.5)
+        gets x, y, dx, dy / scale back. Buttons, keys, wheel and text carry over."""
+        var o = self.copy()
+        o.x, o.y, o.dx, o.dy = self.x / scale, self.y / scale, self.dx / scale, self.dy / scale
+        return o^
+
 
 def readable(fd: Int, ms: Int) -> Bool:
     """poll(2) one fd for input for up to ms milliseconds."""
@@ -107,6 +114,17 @@ struct Window(Movable):
         if self.tex == 0 or (uw and self.utex == 0):
             raise Error("SDL texture failed")
 
+    def scale(self) raises -> Float32:
+        """Display scale of the window (1.0, 1.5, 2.0 ...: pixel density times the OS content scale; 1 if SDL has none)."""
+        var s = self.sdl.get_function[Float32]("SDL_GetWindowDisplayScale")(self.win)
+        return s if s > 0 else 1
+
+    def drawable(self) raises -> Tuple[Int, Int]:
+        """The window's drawable size in physical pixels (0, 0 if SDL cannot tell)."""
+        var wh = List[Int32](length=2, fill=0)
+        _ = self.sdl.get_function[Bool]("SDL_GetWindowSizeInPixels")(self.win, Int(wh.unsafe_ptr()), Int(wh.unsafe_ptr().unsafe_offset(1)))
+        return (Int(wh[0]), Int(wh[1]))
+
     def poll(mut self) raises -> Input:
         var inp = Input(self.x, self.y, 0, 0, 0, self.down, 0, 0, SIMD[DType.uint64, 2](0), False)
         var e = self.ev.unsafe_ptr()
@@ -135,8 +153,9 @@ struct Window(Movable):
                 inp.wheel += f[7]
             elif kind == EV_TEXT:  # SDL_TextInputEvent: the char* at offset 24, owned by SDL until the next poll
                 var p = Pointer[UInt8, MutAnyOrigin](unsafe_from_address=e.unsafe_bitcast[Int]()[3])
-                var n = Int(external_call["strlen", UInt64](p))
-                inp.text += String(unsafe_from_utf8=Span(unsafe_ptr=p, length=n))
+                var n = Int(external_call["strnlen", UInt64](p, UInt64(256)))  # bounded: never scan past 256 bytes
+                if inp.text.byte_length() + n <= 1024:  # one frame's typing; drop the rest rather than grow
+                    inp.text += String(unsafe_from_utf8=Span(unsafe_ptr=p, length=n))
             elif kind == EV_KEY_DOWN or kind == EV_KEY_UP:
                 var sc = Int(e.unsafe_bitcast[UInt32]()[6])
                 if sc < 128:

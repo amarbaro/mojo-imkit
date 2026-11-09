@@ -9,15 +9,18 @@ description: "Immediate-mode GUI for Mojo apps drawn by one GPU compose kernel: 
 `uv sync`; needs system SDL3 and FreeType. `mojo build -I <repo>/src app.mojo`.
 
 ## Use
-Per frame: `inp = win.poll()`, `ui.begin(inp)`, widgets (`ui.panel`, `ui.icon`, `ui.button`, `ui.bar`, `ui.text`),
-`ui.finish()`, `layer.render(ui)`, `win.present(frame_ptr, Int(layer.pixels.unsafe_ptr()))`. See `examples/quickstart.mojo`.
+Per frame: `inp = win.poll()`, `ui.begin(inp, dt)`, widgets (`panel`, `glass`, `button`, `slider`, `menu_*`, `scroll_*`,
+`table_*`, `plot`, `text`), `ui.finish()`, then either `layer.render_into(ui, my_dev_buf)` (GPU app, no readback) or
+`layer.render(ui)` + `win.present(frame_ptr, Int(layer.pixels.unsafe_ptr()))`. See `examples/quickstart.mojo`, `examples/gallery.mojo`.
 
 ## Rules
 - Immediate mode: a widget is a call that returns its interaction; give each a stable Int id.
 - Always call `finish()` before `render`; `render` raises otherwise.
-- Capacities overflow by dropping whole commands, counted in `ui.dropped`; assert it is 0.
+- Capacities overflow by dropping whole commands, counted in `ui.d.dropped`; assert it is 0. NaN commands drop, infinite coordinates clamp.
 - No allocation between `begin` and `finish`. One kernel, one 8-word command layout.
-- ASCII only; scancodes below 128.
+- UTF-8 text (CJK via `Font(path, sizes, fallback=...)`), no shaping; scancodes below 128.
+- Themes: `ui.set_theme(glass()|neon()|flat())`; widgets read theme roles, `button(color=0)` = accent. DPI: `ui.set_scale(win.scale())`, `inp.logical(scale)`.
+- Glass needs the scene: `layer.set_scene(...)` or `blur_from`; without it the backdrop is empty.
 
 ## Large image
 Build with `-DUI_IMG=<pixels>` (default 65,536; a 2560 x 1440 window view is 3,686,400). Per picture: scale or crop to the view on

@@ -1,6 +1,6 @@
 [project]
 name = "mojo-imkit"
-version = "0.7.2"
+version = "0.8.1"
 description = "Immediate-mode GUI for Mojo, composed on the GPU: SDL3 window, FreeType text, widgets as one draw list"
 license = "Apache-2.0"
 requires-python = ">=3.11,<3.15"
