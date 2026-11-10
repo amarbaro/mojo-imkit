@@ -10,10 +10,13 @@ timeout 300 "$M" build -I src tests/avif_seq_info.mojo -o $W/info 2> $W/build.lo
 for r in 0 2; do
   [ -f $F/anim_r$r.avif ] || timeout 60 avifenc -y 420 -q 50 -s 6 --timescale 30 --duration 4 --repetition-count $r $F/src-320.png --duration 7 $F/src-b.png -o $F/anim_r$r.avif > /dev/null
 done
-exp() { avifdec --info "$1" 2>/dev/null | awk '
-  /Repeat Count/{r = tolower($NF); print "repeat " r}
-  /timescales per second/{ts = $2; match($0, /\(([0-9]+) timescales\), ([0-9]+) frames/, m); print "timescale " ts " duration " m[1] " frames " m[2]}
-  /Decoded frame/{match($0, /frame \[([0-9]+)\] \[pts [0-9.]+ \(([0-9]+) timescales\)\] \[duration [0-9.]+ \(([0-9]+) timescales\)\] \[([0-9x]+)\]/, m); print "frame " m[1] " pts " m[2] " duration " m[3] " " m[4] " obu0 18"}'; }
+exp() {  # POSIX sed only (no gawk 3-argument match): CI images ship mawk
+  avifdec --info "$1" 2>/dev/null | sed -E -n \
+    -e 's/.*Repeat Count[^:]*: *([^ ]+).*/repeat \1/p' \
+    -e 's/.* ([0-9]+) timescales per second.*\(([0-9]+) timescales\), ([0-9]+) frames.*/timescale \1 duration \2 frames \3/p' \
+    -e 's/.*Decoded frame \[([0-9]+)\] \[pts [0-9.]+ \(([0-9]+) timescales\)\] \[duration [0-9.]+ \(([0-9]+) timescales\)\] \[([0-9x]+)\].*/frame \1 pts \2 duration \3 \4 obu0 18/p' \
+    | sed -e 's/^repeat Infinite$/repeat infinite/'
+}
 fails=0
 for f in $F/anim.avif $F/anim_r0.avif $F/anim_r2.avif; do
   e=$(exp "$f"); g=$(timeout 10 $W/info "$f" 2>&1)

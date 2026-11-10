@@ -6,8 +6,11 @@ on:
 jobs:
   check:
     runs-on: ubuntu-24.04
+    # The image and decoder oracles need ImageMagick 7 (`magick`), libavif and dav1d from Ubuntu 26.04; the 24.04 host
+    # ships ImageMagick 6. The job runs in the same image that scripts were checked against (ci-local . ubuntu:26.04).
+    container: ubuntu:26.04
     steps:
+      - run: apt-get update -q && DEBIAN_FRONTEND=noninteractive apt-get install -yq --no-install-recommends curl ca-certificates git build-essential python3 fonts-dejavu-core fonts-noto-cjk libfreetype6 imagemagick libwebp7 libavif-bin dav1d ffmpeg
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v10.3.0
-      - run: sudo apt-get update -q && sudo apt-get install -yq fonts-dejavu-core fonts-noto-cjk libfreetype6 imagemagick libwebp7 libavif-bin dav1d ffmpeg
       - run: scripts/ci.sh
