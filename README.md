@@ -4,6 +4,12 @@
 [![ci](https://github.com/amarbaro/mojo-imkit/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/amarbaro/mojo-imkit/actions/workflows/ci.yml) [![latest release](https://img.shields.io/github/v/release/amarbaro/mojo-imkit)](https://github.com/amarbaro/mojo-imkit/releases/latest) [![license](https://img.shields.io/github/license/amarbaro/mojo-imkit)](https://github.com/amarbaro/mojo-imkit/blob/main/LICENSE)
 <!-- /badges -->
 
+The gallery example (`examples/gallery.mojo`) in its three theme presets, rendered on the GPU by `scripts/gallery.sh`:
+
+| glass | neon | flat |
+|---|---|---|
+| ![glass](docs/img/gallery-glass.png) | ![neon](docs/img/gallery-neon.png) | ![flat](docs/img/gallery-flat.png) |
+
 An immediate-mode GUI for Mojo apps, drawn by the GPU. It takes the idea behind Dear ImGui and imgui-bundle (widgets
 are function calls made every frame, no retained widget tree) and builds it in Mojo around a GPU app's own frame:
 widgets append to one flat draw list, one `compose` kernel turns that list into an RGBA layer, and the window blends
