@@ -17,12 +17,12 @@ struct Audio(Movable):
         if not self.sdl.get_function[Bool]("SDL_InitSubSystem")(UInt32(0x10)):  # SDL_INIT_AUDIO
             raise Error("SDL audio init failed")
         var spec = SIMD[DType.int32, 4](0x8120, 1, Int32(rate), 0)  # SDL_AudioSpec: SDL_AUDIO_F32LE, mono, rate
-        self.stream = self.sdl.get_function[Int]("SDL_OpenAudioDeviceStream")(UInt32(0xFFFFFFFF), Pointer(to=spec), Int(0), Int(0))
+        self.stream = self.sdl.get_function[Int]("SDL_OpenAudioDeviceStream")(UInt32(0xFFFFFFFF), UnsafePointer(to=spec), Int(0), Int(0))
         if self.stream == 0:
             raise Error("SDL_OpenAudioDeviceStream failed")
         _ = self.sdl.get_function[Bool]("SDL_ResumeAudioStreamDevice")(self.stream)  # opens paused
 
-    def put(self, samples: Pointer[Float32, _], n: Int) raises:
+    def put(self, samples: UnsafePointer[Float32, _], n: Int) raises:
         _ = self.sdl.get_function[Bool]("SDL_PutAudioStreamData")(self.stream, samples, Int32(4 * n))
 
     def queued(self) raises -> Int:

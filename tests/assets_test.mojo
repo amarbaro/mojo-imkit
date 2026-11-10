@@ -2,7 +2,7 @@
 RGBA, and one from Pillow's encoder), the formats it refuses, pack -> Assets round trip, and Ui.icon_img's image command.
 usage: mojo run -I src tests/assets_test.mojo  (fixtures: tests/fixtures, regenerate with python3 tools/png_fixture.py)"""
 from std.os import getenv
-from imkit.assets import Assets, pack, png_decode
+from imkit.assets import Assets, image_decode, pack, png_decode
 from imkit.draw import flt
 from imkit.font import Font
 from imkit.ui import Ui
@@ -75,6 +75,36 @@ def main() raises:
           "refused before allocating: 4 G pixels wide", fails)
     check(error_of(good.copy(), [(8, UInt8(0xFF)), (9, UInt8(0xFF)), (10, UInt8(0xFF)), (11, UInt8(0xFF))]).find("truncated") >= 0,
           "refused: a chunk length past the end of the file", fails)
+    # image_decode: a JPEG (tests/fixtures/pic.jpg, `magick rgb.png -quality 90 -sampling-factor 2x2`, golden pic.raw from `magick pic.jpg
+    # -depth 8 rgba:pic.raw`) goes to jpeg_decode, a PNG to png_decode, a WebP signature and a stranger raise with their own message
+    var jpg: List[UInt8]
+    var jraw: List[UInt8]
+    with open("tests/fixtures/pic.jpg", "r") as f:
+        jpg = f.read_bytes()
+    with open("tests/fixtures/pic.raw", "r") as f:
+        jraw = f.read_bytes()
+    var jd = image_decode(Span(jpg))
+    var jok = jd[0] == 24 and jd[1] == 20 and len(jd[2]) * 4 == len(jraw)
+    if jok:
+        for i in range(len(jd[2])):
+            for ch in range(4):
+                jok = jok and abs(Int((jd[2][i] >> UInt32(8 * ch)) & 255) - Int(jraw[4 * i + ch])) <= 2
+    check(jok, "image_decode: a JPEG decodes to the oracle's pixels", fails)
+    var pd = image_decode(Span(good))
+    check(pd[0] == 24 and pd[1] == 20 and pd[2][0] == png_decode(Span(good))[2][0], "image_decode: a PNG goes to png_decode", fails)
+    var riff: List[UInt8] = [0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x45, 0x42, 0x50, 0, 0, 0, 0]
+    var stranger: List[UInt8] = [0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 0, 0, 0, 0, 0, 0, 0, 0]
+    var werr = String()
+    var serr = String()
+    try:
+        _ = image_decode(Span(riff))
+    except e:
+        werr = String(e)
+    try:
+        _ = image_decode(Span(stranger))
+    except e:
+        serr = String(e)
+    check(werr.startswith("webp") and serr.startswith("png"), "image_decode: a WebP signature raises webp, a GIF raises png: not a PNG", fails)
     pack(["tests/fixtures/rgba.png", "tests/fixtures/rgb.png", "tests/fixtures/pil.png"], ".work/assets_test")
     var a = Assets(".work/assets_test")
     check(len(a.px) == 3 * 480 and a.find("rgb") == 1 and a.meta[3] == 480 and a.meta[4] == 24 and a.meta[5] == 20 and a.find("pil") == 2 and a.meta[6] == 960 and a.find("nope") == -1,
@@ -87,6 +117,10 @@ def main() raises:
         if a.px[i] != UInt32(raw[4 * i]) | UInt32(raw[4 * i + 1]) << 8 | UInt32(raw[4 * i + 2]) << 16 | UInt32(raw[4 * i + 3]) << 24:
             rgba_ok = False
     check(rgba_ok, "pack then load: the first picture's pixels are the oracle's", fails)
+    pack(["tests/fixtures/rgb.png", "tests/fixtures/pic.jpg"], ".work/assets_test_jpg")
+    var aj = Assets(".work/assets_test_jpg")
+    check(len(aj.px) == 2 * 480 and aj.find("pic") == 1 and aj.meta[3] == 480 and aj.meta[4] == 24 and aj.meta[5] == 20,
+          "pack: a JPEG and a PNG in one atlas", fails)
     var ui = Ui(Font(getenv("IMKIT_FONT", "/usr/share/fonts/TTF/Roboto-Medium.ttf"), [13, 16, 22]))
     ui.assets = a^
     ui.begin(Input(0, 0, 0, 0, 0, 0, 0, 0, SIMD[DType.uint64, 2](0), False))

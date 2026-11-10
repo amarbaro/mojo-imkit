@@ -32,15 +32,29 @@ def glass() -> Theme:
 
 
 def neon() -> Theme:
-    return Theme(rgba(6, 4, 14, 224), rgba(20, 14, 38, 255), rgba(36, 24, 66, 255), rgba(0, 240, 255, 255),
+    return Theme(rgba(6, 4, 14, 224), rgba(62, 44, 112, 255), rgba(84, 60, 146, 255), rgba(0, 240, 255, 255),
                  rgba(57, 255, 136, 255), rgba(255, 214, 10, 255), rgba(255, 45, 120, 255), rgba(235, 240, 255, 255), rgba(6, 4, 14, 255),
                  rgba(150, 130, 200, 255), rgba(0, 240, 255, 90), rgba(0, 240, 255, 200), 8, 0.5, 1, 24)
 
 
 def flat() -> Theme:
-    return Theme(rgba(246, 247, 249, 255), rgba(226, 229, 234, 255), rgba(208, 213, 222, 255), rgba(37, 99, 235, 255),
+    return Theme(rgba(246, 247, 249, 255), rgba(216, 220, 227, 255), rgba(198, 204, 215, 255), rgba(37, 99, 235, 255),
                  rgba(21, 128, 61, 255), rgba(180, 83, 9, 255), rgba(220, 38, 38, 255), rgba(17, 24, 39, 255), rgba(255, 255, 255, 255),
                  rgba(100, 108, 122, 255), rgba(0, 0, 0, 40), rgba(176, 184, 198, 255), 4, 0.25, 1, 5)
+
+
+def amarbaro() -> Theme:
+    """amarbaro.com (brand/tokens.css, dark default): olive accent, 4-6 px corners, quiet borders."""
+    return Theme(rgba(15, 20, 29, 238), rgba(33, 43, 61, 255), rgba(44, 56, 78, 255), rgba(157, 174, 81, 255),  # controls one step past surface-active: imkit buttons have no border
+                 rgba(34, 197, 94, 255), rgba(245, 158, 11, 255), rgba(200, 16, 46, 255), rgba(243, 246, 250, 255), rgba(8, 11, 16, 255),
+                 rgba(119, 135, 158, 255), rgba(0, 0, 0, 110), rgba(30, 39, 54, 255), 6, 0.27, 1, 10)
+
+
+def amarbaro_light() -> Theme:
+    """amarbaro.com light: white panels, darker olive for AA, slate text."""
+    return Theme(rgba(255, 255, 255, 250), rgba(214, 221, 230, 255), rgba(196, 205, 217, 255), rgba(85, 102, 31, 255),  # controls at border tone: no border on imkit buttons
+                 rgba(21, 128, 61, 255), rgba(169, 93, 5, 255), rgba(138, 3, 3, 255), rgba(10, 15, 22, 255), rgba(255, 255, 255, 255),
+                 rgba(90, 104, 125, 255), rgba(0, 0, 0, 36), rgba(208, 216, 226, 255), 6, 0.27, 1, 6)
 
 
 comptime PANEL = glass().panel

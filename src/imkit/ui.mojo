@@ -7,6 +7,7 @@ from .anim import Anim
 from .draw import Draw, TX, TY, NBIN, NCMD, CW, UW, UH, ISRC, AH, rgba
 from .font import Font
 from .theme import Theme, glass
+from .contrast import contrast
 from .window import Input
 
 comptime SC_BACKSPACE = 42  # SDL scancode
@@ -267,6 +268,39 @@ struct Ui(Movable):
         self.rect(x0, self.y + 4, x0 + w - 64, self.y + 12, 4, self.theme.surface)
         self.rect(x0, self.y + 4, x0 + (w - 64) * min(max(v, 0), 1), self.y + 12, 4, c)
         self.y += 20
+
+    def heading(mut self, s: StringSlice, size: Int, w: Float32):
+        """A heading in font slot `size` at the cursor, an accent rule under it as wide as w; next row."""
+        var a = self.asc(size)
+        _ = self.text(self.x, self.y, s, size, self.theme.text)
+        self.rect(self.x, self.y + a * 1.35, self.x + w, self.y + a * 1.35 + 2, 1, self.theme.accent)
+        self.y += a * 1.35 + 10
+
+    def caption(mut self, s: StringSlice, size: Int = 0):
+        """Muted small text at the cursor (pass the smallest font slot); next row."""
+        _ = self.text(self.x, self.y, s, size, self.theme.muted)
+        self.y += self.asc(size) * 1.5
+
+    def separator(mut self, w: Float32):
+        """A one-pixel rule in the outline colour across w; next row."""
+        self.rect(self.x, self.y + 4, self.x + w, self.y + 5, 0, self.theme.border_c | 0x60000000)
+        self.y += 10
+
+    def badge(mut self, label: StringSlice, c: UInt32, size: Int = 0) -> Float32:
+        """A pill with label on colour c at the cursor; the cursor moves right by its width plus 6. Returns that width."""
+        var tw = self.tw(label, size)
+        var h = self.asc(size) + 8
+        self.rect(self.x, self.y, self.x + tw + 14, self.y + h, h / 2, c)
+        var ink = rgba(255, 255, 255, 255) if contrast(rgba(255, 255, 255, 255), c) >= contrast(rgba(0, 0, 0, 255), c) else rgba(0, 0, 0, 255)
+        _ = self.text(self.x + 7, self.y + 4, label, size, ink)  # black or white per pill colour (warn/bad are not the accent)
+        self.x += tw + 20
+        return tw + 14
+
+    def kv(mut self, key: StringSlice, value: StringSlice, w: Float32, size: Int = 0):
+        """key muted on the left, value right-aligned at x + w; next row."""
+        _ = self.text(self.x, self.y, key, size, self.theme.muted)
+        _ = self.text(self.x + w - self.tw(value, size), self.y, value, size, self.theme.text)
+        self.y += self.asc(size) * 1.6
 
     def spark(mut self, vals: List[Float32], lo: Float32, hi: Float32, w: Float32, h: Float32, c: UInt32):
         """Line chart of vals (oldest first) in a w x h box at the cursor, with the last point marked; next row."""

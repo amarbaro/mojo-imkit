@@ -42,5 +42,9 @@ done
 .work/anim_test || { echo "FAIL anim: tests/anim_test.mojo"; exit 1; }
 .work/ui_cpu_test || { echo "FAIL ui: tests/ui_cpu_test.mojo"; exit 1; }
 .work/quickstart > /dev/null || { echo "FAIL example: examples/quickstart.mojo"; exit 1; }
+$M run -I src tests/style_test.mojo > .work/style_test.log 2>&1 || { echo "FAIL style: tests/style_test.mojo"; tail -5 .work/style_test.log; exit 1; }
+bash tests/jpeg_test.sh > .work/jpeg_test.log 2>&1 || { echo "FAIL jpeg: tests/jpeg_test.sh"; tail -8 .work/jpeg_test.log; exit 1; }
+bash tests/webp_test.sh > .work/webp_test.log 2>&1 || { echo "FAIL webp: tests/webp_test.sh"; tail -8 .work/webp_test.log; exit 1; }
+echo "ok   style, jpeg, webp: $(tail -1 .work/style_test.log | cut -c1-60); $(tail -1 .work/jpeg_test.log); $(grep -c '^PASS' .work/webp_test.log) webp PASS lines"
 MUTANT_DRY=1 scripts/mutants.sh > .work/mutants_dry.txt 2>&1 || { echo "FAIL mutants: a sed no longer matches its line, see .work/mutants_dry.txt"; grep FAIL .work/mutants_dry.txt | head -3; exit 1; }
 echo "PASS ci"

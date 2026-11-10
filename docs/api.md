@@ -11,7 +11,6 @@
 | `win.text_input(on)`; `Input.text` | SDL text events on or off; the text typed this frame (UTF-8), joined by `Input.merge` |
 | `Font(path, sizes, fallback="")` | glyph atlas from a TrueType font: ASCII 32-126 at start, any other codepoint (UTF-8 text) rasterized on first use, from `fallback` when `path` lacks it, else drawn as `?`; AW x AH atlas (`-DUI_ATLAS_H=`, default 1024), skyline-packed, no eviction (`font.full` counts glyphs that did not fit); `Layer` uploads only the rows rasterized since the last frame |
 | `Ui(font)`; `begin(input)`, `finish()` | one frame; `finish` bins commands into 16 x 16 tiles |
-| `Font(path, sizes)` | glyph atlas from a TrueType font, ASCII 32-126 |
 | `Ui(font)`; `begin(input, dt=0)`, `finish()` | one frame, `dt` seconds long (0: springs hold still); `finish` bins commands into 16 x 16 tiles |
 | `style(c1, mode, gx, gy, sx, sy, sr, sc) -> id`; `srect(x0, y0, x1, y1, r, c, id, border, bcol)` | per-frame style (256 max): fill gradient from `c` to `c1` (mode 1 linear along (gx, gy), 2 radial) and a shadow moved by (sx, sy), blurred sr, color sc; srect draws a rounded rect with it |
 | `clip(x0, y0, x1, y1)`, `unclip()` | everything drawn between is cut to the rect (hard edge at pixel centers, one level: a new clip replaces the old; binned only into the rect's tiles) |
@@ -24,6 +23,11 @@
 | `animate(id, target) -> Float32` | spring value for widget `id` moving to `target`; first sight starts at the target; ids not asked for last frame are evicted (`anim.mojo`) |
 | `set_scale(s)`; `w()`, `h()`, `tw(s, size)`, `asc(size)` | DPI: widgets, cursor, hit tests and input are logical, drawn at `s` layer pixels per unit; sizes of the layer and of text in logical units. Build the `Font` with sizes times `s` for sharp text. `Window.scale()`, `drawable()`, `Input.logical(s)` |
 | `set_theme(theme)`; `glass()`, `neon()`, `flat()` | every widget colour and shape (radius, roundness, border, shadow) comes from `ui.theme` roles (`theme.mojo`); `button(color=0)` is the theme accent |
+| `heading(s, size, w)`, `caption(s, size=0)`, `separator(w)` | a heading in font slot `size` with an accent rule `w` wide; muted small text; a one-pixel rule; each moves the cursor to the next row |
+| `badge(label, c, size=0) -> width`, `kv(key, value, w, size=0)` | a pill on colour `c` whose label is black or white for that fill (cursor moves right); a muted key with its value right-aligned at `x + w` |
+| `amarbaro()`, `amarbaro_light()` | themes from amarbaro.com's brand tokens: olive accent, 6 px corners, blood-red danger; dark and light |
+| `style(name)`, `STYLE_NAMES` (`imkit.styles`) | 29 themes measured from ComfyUI style swatches by `tools/gen_styles.mojo`; every theme passes `imkit.contrast.theme_faults` (text, labels, controls and status colours) |
+| `contrast(a, b)`, `theme_faults(t)` (`imkit.contrast`) | WCAG 2 contrast of two colours; empty string when a theme passes, else the failing pairs |
 | `slider(id, v, lo, hi, w) -> Float32` | a press captures the mouse; value follows x until release, also outside the track |
 | `menu_begin(id, label, w, n) -> Bool`, `menu_item(label) -> Bool`, `menu_end()` | one popup level of `n` items; closes on outside press, Escape, header click or a pick; draw menus last (draw order is z order) |
 | `scroll_begin(id, w, h, rows, rh, off) -> (first, end)`, `scroll_row(id, k, label, on)`, `scroll_y(k)`, `scroll_end()` | virtualized list, caller-owned `off` moved by the wheel; rows are clipped to the viewport; cost does not grow with `rows` |
@@ -39,5 +43,11 @@ drop and `ui.d.dropped` counts them.
 ## Asset atlas
 
 Bad input (v0.8.1): a NaN coordinate drops its command (counted in `ui.d.dropped`), infinite and huge ones clamp to +-1e6; a font size index the `Font` lacks draws nothing (counted) and measures 0; `scroll_begin` reads a row height of 0, negative, NaN or inf as 1; axis labels print `nan`, `>1e9`, `<-1e9`; `png_decode` raises `png: IHDR chunk is N bytes` and `png: W x H is too large` (64 M pixels) before allocating; `clip` ends the clip in force before starting a new one (one extra command); `Font` takes up to 256 sizes.
+
+JPEG (`imkit.jpeg`, pure Mojo, no library): `jpeg_decode(bytes) -> (w, h, pixels)` takes baseline, extended-sequential and progressive Huffman files, 8-bit, 1 (grey, expanded to RGB) or 3 (YCbCr, or RGB when the Adobe flag or component ids say so) components, any 1 to 4 sampling factors, restart markers; arithmetic coding, lossless, 12-bit and CMYK raise `jpeg: ...`. Output is bit-identical to libjpeg-turbo 3.2.1 (ISLOW IDCT, fancy upsampling) on the 27 gate fixtures. `image_decode(bytes)` picks the decoder by signature (FF D8 JPEG, else PNG; a RIFF....WEBP file raises `webp: no decoder in this build yet` until `imkit.webp` is merged), and `pack` calls it, so an atlas can mix PNGs and JPEGs. Same 64 M pixel guard as `png_decode`, checked before any allocation. Checks: `tests/jpeg_test.sh` (ImageMagick writes fixtures and goldens, never run time).
+
+WebP (`imkit.webp`, pure Mojo, no library): `webp_decode(bytes) -> (w, h, pixels)` takes lossless (VP8L, all transforms, colour cache), lossy
+(VP8 key frames) and alpha (ALPH, raw or lossless, with filters); animation raises. `image_decode(bytes)` picks PNG, JPEG or WebP by signature,
+and `pack` uses it, so atlases take all three.
 
 `python3 tools/png_fixture.py` writes the test fixtures. `mojo run -I src tools/pack_atlas.mojo assets/atlas assets/src/*.png` packs 8-bit RGB/RGBA PNGs (Blender icons, ComfyUI textures) into `assets/atlas.bin` (RGBA bytes) and `assets/atlas.txt` (`name offset width height`, name = file stem). At run time: `ui.assets = Assets("assets/atlas")`, `layer.set_assets(ui.assets)` once (copies to the image pool from offset 0; a `set_image` picture below `len(assets.px)` makes it raise, so give `set_image` an offset past the atlas), then `ui.icon_img("play", x, y)` each frame (own size, or `w, h` to scale; `alpha`); an unknown name returns False and counts in `ui.d.dropped`.

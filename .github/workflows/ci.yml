@@ -9,4 +9,4 @@ jobs:
   ci:
     uses: amarbaro/mojo-libs/.github/workflows/lib-ci.yml@v1
     with:
-      apt: "fonts-dejavu-core fonts-noto-cjk libfreetype6"
+      apt: "fonts-dejavu-core fonts-noto-cjk libfreetype6 imagemagick libwebp7"

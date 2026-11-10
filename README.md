@@ -4,11 +4,19 @@
 [![ci](https://github.com/amarbaro/mojo-imkit/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/amarbaro/mojo-imkit/actions/workflows/ci.yml) [![latest release](https://img.shields.io/github/v/release/amarbaro/mojo-imkit)](https://github.com/amarbaro/mojo-imkit/releases/latest) [![license](https://img.shields.io/github/license/amarbaro/mojo-imkit)](https://github.com/amarbaro/mojo-imkit/blob/main/LICENSE)
 <!-- /badges -->
 
-The gallery example (`examples/gallery.mojo`) in its three theme presets, rendered on the GPU by `scripts/gallery.sh`:
+The gallery example (`examples/gallery.mojo`), rendered on the GPU by `scripts/gallery.sh`, in the amarbaro themes and the three built-ins:
+
+| amarbaro | amarbaro-light |
+|---|---|
+| ![amarbaro](docs/img/gallery-amarbaro.png) | ![amarbaro-light](docs/img/gallery-amarbaro-light.png) |
 
 | glass | neon | flat |
 |---|---|---|
 | ![glass](docs/img/gallery-glass.png) | ![neon](docs/img/gallery-neon.png) | ![flat](docs/img/gallery-flat.png) |
+
+Eight of the 29 generated styles (`imkit.styles`, each with a background and 8 icons in `assets/styles/`):
+
+![styles](docs/img/styles.jpg)
 
 An immediate-mode GUI for Mojo apps, drawn by the GPU. It takes the idea behind Dear ImGui and imgui-bundle (widgets
 are function calls made every frame, no retained widget tree) and builds it in Mojo around a GPU app's own frame:
@@ -16,55 +24,45 @@ widgets append to one flat draw list, one `compose` kernel turns that list into 
 the layer over the app's picture. No Python UI process, no C++ library, no bundled windowing: the system's SDL3 and
 FreeType are called through Mojo's FFI.
 
-Install: `pixi workspace channel add https://conda.modular.com/max https://prefix.dev/amarbaro/amarbaro`, then `pixi add mojo-imkit` (import `imkit`). From source: `git clone https://github.com/amarbaro/mojo-imkit`, then `mojo run -I mojo-imkit/src app.mojo`.
-Toolchains: Mojo 1.2 stable, and the nightly 1.3.0.dev2026110805 in the weekly [mojo-libs](https://github.com/amarbaro/mojo-libs) matrix (36 libraries on stable, 35 on nightly).
-
 
 ## Modules
 
 | module | what it does |
 |---|---|
 | `imkit.window` | SDL3 window, vsync, letterboxed streaming texture; `poll() -> Input` (mouse, wheel, buttons, keys, typed text, quit), `text_input(on)`, `present(frame, ui)`, `push()` synthetic mouse, key and text events for scripted checks |
-| `imkit.layer` | `Layer(ctx, ui)`: the GPU side on your DeviceContext; `render_into(ui, dev_buf)` composes into your own device buffer (no readback), `render(ui)` also fills the pinned `pixels`; `set_image`, `set_assets`, `set_scene`/`blur_from` (glass backdrop). Scene and pinned buffers are allocated on first use |
-| `imkit.font` | UTF-8 text from a TrueType font plus an optional fallback (CJK); glyphs rasterized on demand into a skyline atlas, only the rows in use held on the host |
+| `imkit.layer` | `Layer(ctx, ui)`: the GPU side on your DeviceContext (buffers, atlas from `ui`, image sources `src`); `render(ui)` after `Ui.finish()` uploads only what the frame used and fills the pinned `pixels`; `set_image(px, w, h)` copies one picture to the image pool (`-DUI_IMG=` sizes it) |
+| `imkit.font` | glyph atlas from a TrueType font (ASCII 32-126, a few pixel sizes, alpha8), built once at start |
 | `imkit.draw` | `Draw` (`ui.d`): the command list, tile binning, the `compose` kernel; counters `ui.d.n`, `ui.d.dropped` |
-| `imkit.ui` | `Ui`: `begin(input, dt)`, `panel`, `glass`, `button`, `icon`, `icon_img`, `bar`, `spark`, `text`, `field`, `slider`, `menu_*`, `scroll_*`, `table_*`, `plot`, `rect`, `rrect`, `srect`, `line`, `tri`, `image`, `clip`/`unclip`, `animate`, `set_theme`, `set_scale`, `finish()` |
-| `imkit.atlas`, `imkit.assets` | skyline packer for the glyph atlas; PNG asset atlas (`pack`, `Assets`, `png_decode`) |
-| `imkit.theme` | `Theme` roles and the presets `glass()`, `neon()`, `flat()`; the module constants are the glass values |
+| `imkit.ui` | `Ui`: `begin(input)`, `panel`, `button`, `icon`, `bar`, `spark`, `text`, `field` (single-line text box), `rect`, `line`, `tri`, `image`, `finish()` |
+| `imkit.atlas`, `imkit.assets` | skyline packer for the glyph atlas; PNG, JPEG and WebP asset atlas (`pack`, `Assets`, `image_decode`, `png_decode`) |
+| `imkit.jpeg` | pure Mojo JPEG decoder, baseline and progressive (`jpeg_decode`) |
+| `imkit.webp` | pure Mojo WebP decoder: lossless, lossy and alpha (`webp_decode`) |
+| `imkit.styles`, `imkit.contrast` | 29 generated themes (`style(name)`, `STYLE_NAMES`) and the WCAG contrast gate every theme passes |
+| `imkit.theme` | `Theme` roles and the presets `glass()`, `neon()`, `flat()`, `amarbaro()`, `amarbaro_light()`; the module constants are the glass values |
 
 ## Use
 
 ```mojo
-"""A headless frame: widgets with a scripted click, no window and no GPU. Prints what the frame produced.
-
-usage: IMKIT_FONT=/path/font.ttf mojo run -I src examples/quickstart.mojo  (default font: Roboto Medium)
-"""
-from std.os import getenv
+from imkit.window import Window
 from imkit.font import Font
-from imkit.ui import TX, TY, Ui
-from imkit.window import Input
+from imkit.layer import Layer
+from imkit import ui as im
+from max.gpu.host import DeviceContext
 
-
-def frame(mut ui: Ui, inp: Input) -> Bool:
-    ui.begin(inp)
-    ui.panel(20, 16, 300, 100, "Run")
-    var clicked = ui.icon(1, 1)  # 0 play, 1 pause, 2 step, 3 stop
-    ui.finish()  # bins the commands into 16 x 16 tiles for the compose kernel
-    return clicked
-
-
-def main() raises:
-    var ui = Ui(Font(getenv("IMKIT_FONT", "/usr/share/fonts/TTF/Roboto-Medium.ttf"), [13, 16, 22]))
-    var keys = SIMD[DType.uint64, 2](0)
-    # the pause icon sits at (36, 56) to (72, 92): press and release on it
-    var press = Input(50, 70, 0, 0, 0, 1, 1, 0, keys, False)
-    var release = Input(50, 70, 0, 0, 0, 0, 0, 1, keys, False)
-    var before = frame(ui, press)
-    var clicked = frame(ui, release)
-    print("click after press:", before, "after release:", clicked)
-    print("commands:", ui.n, "tile entries:", Int(ui.off[TX * TY]), "dropped:", ui.dropped)
-    if before or not clicked or ui.dropped != 0 or ui.n == 0:
-        raise Error("quickstart: the click or the draw list is wrong")
+var win = Window("App", W, H, im.UW, im.UH)          # W x H: your frame; UW x UH: the UI layer
+var u = im.Ui(Font("/usr/share/fonts/TTF/Roboto-Medium.ttf", [13, 16, 22]))
+var layer = Layer(DeviceContext(), u)                # once, on your app's context: buffers, the atlas from u
+while True:
+    var inp = win.poll()
+    if inp.quit:
+        break
+    u.begin(inp)
+    u.panel(20, 16, 400, 92, "Run")
+    if u.icon(1, 1):                                  # 0 play, 1 pause, 2 step, 3 stop
+        pause()
+    u.finish()                                        # bins the commands into 16 x 16 tiles
+    layer.render(u)                                   # uploads what the frame used, composes, copies back; synchronizes
+    win.present(frame_ptr, Int(layer.pixels.unsafe_ptr()))
 ```
 
 ## Install
@@ -77,22 +75,20 @@ Mojo 1.2 and MAX 26.7 from `uv sync`; system `libSDL3.so.0` (3.4) and `libfreety
 
 `scripts/ci.sh` (no GPU, no display): precompile, build of every test, `font_test` (glyph atlas), `ui_cpu_test` (click =
 press then release, tile bins, overflow drops counted, text fields, image fit; a mutant of the click rule fails it) and the quickstart.
-`scripts/mutants.sh` plants known bugs in a copy of `src` (field maximum, text join, `push` NaN guard, image/asset overwrite, ...); each must fail its test, and `ci.sh` dry-runs them so a stale mutant fails CI.
+`scripts/mutants.sh` breaks the field maximum and the text join of `Input.merge` in a copy of `src`; each must fail its test.
 `scripts/local_gate.sh` (run locally, GitHub runners have no GPU or display): `ui_test` composes on the GPU and checks
-pixels, `window_test` opens a real SDL3 window. Last local run (v0.8.1) on an RX 7900 XTX (gfx1100), KDE Wayland: `PASS local_gate` (ui_test, window_test, audio_test).
+pixels, `window_test` opens a real SDL3 window. Last local run on an RX 7900 XTX (gfx1100), KDE Wayland: `PASS ui_test`.
 
 ## Performance
 
-RX 7900 XTX, 1280 x 720, 150 commands (v0.8.1): compose about 17 us per launch; `render_into` 62 to 80 us per frame
-(no readback), `render` about 210 us including the 3.7 MB copy back. Memory at `Layer` creation for a `render_into` app:
-5.6 MB (was 13.5 MB in v0.8.0); through SDL `render()`, 9.3 MB. Numbers move with GPU clocks and load; `tools/membench`
-and `tools/uibench` print them. Design and budgets:
+RX 7900 XTX, 1280 x 720, 150 commands, one run of `ui_test`: compose 25.8 us per launch, render 194 us per frame
+including the 3.7 MB layer copy back. Buffers (allocated once): draw list 128 KB, tile bins 64 KB, atlas 128 KB on the
+card. An earlier run measured compose at 17.7 us; the number moves with GPU clocks and load. Design and budgets:
 [docs/design.md](docs/design.md), API: [docs/api.md](docs/api.md).
 
 ## Limits
 
-- No text shaping (Arabic, Indic), bidi or emoji color; the glyph atlas does not evict (a full atlas draws `?`, counted in `font.full`).
-- `Ui.field` is one line: append and Backspace on UTF-8 code points; no cursor movement, selection, paste or key repeat. No docking.
-- Glass blur needs the app's scene (`set_scene` or `blur_from`). PNG loader: 8-bit RGB/RGBA, not interlaced, CRC not checked.
+- UTF-8 text draws one glyph per codepoint (no shaping, bidi or emoji color); the atlas does not evict; no docking, axes plots, sliders, menus or DPI scaling. `Ui.field` is one ASCII line (append, Backspace; no cursor movement, selection, paste or key repeat).
 - Needs a GPU MAX supports for `Layer`; only gfx1100 was tested. Struct offsets are those of SDL 3.4 and FreeType 2.14.
-- Key scancodes below 128 only. CI covers the CPU side; the compose kernel, window and audio are checked locally.
+- Key scancodes below 128 only. `Audio` (mono float playback) has no automated check.
+- CI covers the CPU side only; the compose kernel and the window are checked locally.

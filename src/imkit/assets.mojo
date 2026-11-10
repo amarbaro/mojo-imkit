@@ -1,10 +1,14 @@
-"""Offline asset atlas. `pack` reads PNGs (Blender icons, ComfyUI textures) and writes PREFIX.bin (every picture's RGBA bytes
+"""Offline asset atlas. `pack` reads PNGs and JPEGs (Blender icons, ComfyUI textures) and writes PREFIX.bin (every picture's RGBA bytes
 back to back, r | g << 8 | b << 16 | a << 24 per pixel) and PREFIX.txt (one line `name offset width height`, the name is the file
 stem, the offset is in pixels). `Assets(PREFIX)` loads both at run time; `Layer.set_assets` puts the pixels in the image pool
 and `Ui.icon_img(name, x, y)` draws one. `png_decode` takes 8-bit RGB or RGBA, no interlace, through the system libz (CRCs are
-not checked); anything else raises. Build with tools/pack_atlas.mojo; tools/png_fixture.py is the test oracle.
+not checked); anything else raises. `image_decode` picks the decoder by the file's first bytes: FF D8 is `jpeg_decode` (imkit.jpeg, pure
+Mojo), RIFF....WEBP is not decoded yet, anything else is `png_decode`. Build with tools/pack_atlas.mojo; tools/png_fixture.py is the
+PNG test oracle, tests/jpeg_test.sh the JPEG one.
 """
 from std.ffi import OwnedDLHandle
+from imkit.jpeg import jpeg_decode
+from imkit.webp import webp_decode
 
 
 comptime MAXPX = 1 << 26  # the largest picture png_decode allocates for: 64 M pixels, 256 MB as RGBA
@@ -73,6 +77,15 @@ def png_decode(d: Span[UInt8, _]) raises -> Tuple[Int, Int, List[UInt32]]:
     return (w, h, px^)
 
 
+def image_decode(d: Span[UInt8, _]) raises -> Tuple[Int, Int, List[UInt32]]:
+    """(width, height, pixels) of a JPEG or PNG, told apart by signature."""
+    if len(d) >= 12 and d[0] == 0x52 and d[1] == 0x49 and d[2] == 0x46 and d[3] == 0x46 and d[8] == 0x57 and d[9] == 0x45 and d[10] == 0x42 and d[11] == 0x50:
+        return webp_decode(d)
+    if len(d) >= 2 and d[0] == 0xFF and d[1] == 0xD8:
+        return jpeg_decode(d)
+    return png_decode(d)
+
+
 struct Assets(Movable):
     var px: List[UInt32]  # every picture back to back
     var names: List[String]
@@ -108,14 +121,14 @@ struct Assets(Movable):
 
 
 def pack(paths: List[String], prefix: String) raises:
-    """Decode each PNG and write PREFIX.bin and PREFIX.txt (name = file stem)."""
+    """Decode each PNG or JPEG and write PREFIX.bin and PREFIX.txt (name = file stem)."""
     var bin = List[UInt8]()
     var txt = String()
     for p in paths:
         var parts = p.split("/")
         var stem = String(String(parts[len(parts) - 1]).split(".")[0])
         with open(p, "r") as f:
-            var pic = png_decode(Span(f.read_bytes()))
+            var pic = image_decode(Span(f.read_bytes()))
             txt += stem + " " + String(len(bin) // 4) + " " + String(pic[0]) + " " + String(pic[1]) + "\n"
             for v in pic[2]:
                 bin.extend([UInt8(v & 255), UInt8((v >> 8) & 255), UInt8((v >> 16) & 255), UInt8(v >> 24)])
