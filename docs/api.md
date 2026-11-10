@@ -44,10 +44,22 @@ drop and `ui.d.dropped` counts them.
 
 Bad input (v0.8.1): a NaN coordinate drops its command (counted in `ui.d.dropped`), infinite and huge ones clamp to +-1e6; a font size index the `Font` lacks draws nothing (counted) and measures 0; `scroll_begin` reads a row height of 0, negative, NaN or inf as 1; axis labels print `nan`, `>1e9`, `<-1e9`; `png_decode` raises `png: IHDR chunk is N bytes` and `png: W x H is too large` (64 M pixels) before allocating; `clip` ends the clip in force before starting a new one (one extra command); `Font` takes up to 256 sizes.
 
-JPEG (`imkit.jpeg`, pure Mojo, no library): `jpeg_decode(bytes) -> (w, h, pixels)` takes baseline, extended-sequential and progressive Huffman files, 8-bit, 1 (grey, expanded to RGB) or 3 (YCbCr, or RGB when the Adobe flag or component ids say so) components, any 1 to 4 sampling factors, restart markers; arithmetic coding, lossless, 12-bit and CMYK raise `jpeg: ...`. Output is bit-identical to libjpeg-turbo 3.2.1 (ISLOW IDCT, fancy upsampling) on the 27 gate fixtures. `image_decode(bytes)` picks the decoder by signature (FF D8 JPEG, else PNG; a RIFF....WEBP file raises `webp: no decoder in this build yet` until `imkit.webp` is merged), and `pack` calls it, so an atlas can mix PNGs and JPEGs. Same 64 M pixel guard as `png_decode`, checked before any allocation. Checks: `tests/jpeg_test.sh` (ImageMagick writes fixtures and goldens, never run time).
+JPEG (`imkit.jpeg`, pure Mojo, no library): `jpeg_decode(bytes) -> (w, h, pixels)` takes baseline, extended-sequential and progressive Huffman files, 8-bit, 1 (grey, expanded to RGB) or 3 (YCbCr, or RGB when the Adobe flag or component ids say so) components, any 1 to 4 sampling factors, restart markers; arithmetic coding, lossless, 12-bit and CMYK raise `jpeg: ...`. Output is bit-identical to libjpeg-turbo 3.2.1 (ISLOW IDCT, fancy upsampling) on the 27 gate fixtures. `image_decode(bytes)` picks the decoder by signature (see the AVIF paragraph), and `pack` calls it, so an atlas can mix PNG, JPEG, WebP and AVIF. Same 64 M pixel guard as `png_decode`, checked before any allocation. Checks: `tests/jpeg_test.sh` (ImageMagick writes fixtures and goldens, never run time).
 
 WebP (`imkit.webp`, pure Mojo, no library): `webp_decode(bytes) -> (w, h, pixels)` takes lossless (VP8L, all transforms, colour cache), lossy
 (VP8 key frames) and alpha (ALPH, raw or lossless, with filters); animation raises. `image_decode(bytes)` picks PNG, JPEG or WebP by signature,
 and `pack` uses it, so atlases take all three.
+
+AVIF (`imkit.avifrgb`, pure Mojo, no library): `avif_decode(bytes) -> (w, h, pixels)` decodes the primary item of an AVIF still
+image: 8, 10 and 12 bit, 4:2:0, 4:2:2, 4:4:4 and monochrome, alpha (the auxiliary item), superres, film grain, intra block copy,
+palette, every intra tool and loop filter of AV1 (deblocking, CDEF, loop restoration). YUV to RGB uses the file's matrix
+(identity, BT.709, BT.601, BT.2020 NCL) and range, bilinear chroma with centred siting, 8-bit output. Inter frames (the frames
+after the first of an animated AVIF) raise `av1tile: inter frames are not supported`; `avis_info(bytes)` (`imkit.avifseq`) still
+reads an image sequence's timing and sample table. Same 64 M pixel guard as `png_decode`. Lower levels: `avif_info` (container,
+`imkit.avif`), `parse_av1` (OBU headers, `imkit.av1obu`), `decode_frame(stream) -> Frame` (YUV planes, `imkit.av1dec`).
+`image_decode(bytes)` picks PNG, JPEG (FF D8), WebP (RIFF....WEBP) or AVIF (an ISO BMFF `ftyp` box at byte 4).
+Checks: the decoded YUV planes equal avifdec / dav1d sample for sample on 32 fixtures (`tests/avif_yuv_test.sh`); RGBA is within
+2 levels of avifdec's PNG at 8 bit and 3 at 10 / 12 bit (avifdec converts through libyuv's fixed-point path), exact for 4:4:4,
+monochrome, lossless and identity (`tests/avif_rgba_test.sh`). Every gate carries mutants that must break it.
 
 `python3 tools/png_fixture.py` writes the test fixtures. `mojo run -I src tools/pack_atlas.mojo assets/atlas assets/src/*.png` packs 8-bit RGB/RGBA PNGs (Blender icons, ComfyUI textures) into `assets/atlas.bin` (RGBA bytes) and `assets/atlas.txt` (`name offset width height`, name = file stem). At run time: `ui.assets = Assets("assets/atlas")`, `layer.set_assets(ui.assets)` once (copies to the image pool from offset 0; a `set_image` picture below `len(assets.px)` makes it raise, so give `set_image` an offset past the atlas), then `ui.icon_img("play", x, y)` each frame (own size, or `w, h` to scale; `alpha`); an unknown name returns False and counts in `ui.d.dropped`.

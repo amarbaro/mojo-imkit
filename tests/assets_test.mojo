@@ -2,6 +2,7 @@
 RGBA, and one from Pillow's encoder), the formats it refuses, pack -> Assets round trip, and Ui.icon_img's image command.
 usage: mojo run -I src tests/assets_test.mojo  (fixtures: tests/fixtures, regenerate with python3 tools/png_fixture.py)"""
 from std.os import getenv
+from imkit.avifrgb import avif_decode
 from imkit.assets import Assets, image_decode, pack, png_decode
 from imkit.draw import flt
 from imkit.font import Font
@@ -105,6 +106,12 @@ def main() raises:
     except e:
         serr = String(e)
     check(werr.startswith("webp") and serr.startswith("png"), "image_decode: a WebP signature raises webp, a GIF raises png: not a PNG", fails)
+    var avif_bytes: List[UInt8]
+    with open("tests/fixtures/avif/a444.avif", "r") as f:
+        avif_bytes = f.read_bytes()
+    var dec = image_decode(Span(avif_bytes))
+    var direct = avif_decode(Span(avif_bytes))
+    check(dec[0] == 320 and dec[1] == 180 and len(dec[2]) == 320 * 180 and dec[2] == direct[2], "image_decode: an AVIF goes to avif_decode", fails)
     pack(["tests/fixtures/rgba.png", "tests/fixtures/rgb.png", "tests/fixtures/pil.png"], ".work/assets_test")
     var a = Assets(".work/assets_test")
     check(len(a.px) == 3 * 480 and a.find("rgb") == 1 and a.meta[3] == 480 and a.meta[4] == 24 and a.meta[5] == 20 and a.find("pil") == 2 and a.meta[6] == 960 and a.find("nope") == -1,

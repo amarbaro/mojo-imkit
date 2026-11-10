@@ -20,6 +20,7 @@ Per frame: `inp = win.poll()`, `ui.begin(inp, dt)`, widgets (`panel`, `glass`, `
 - No allocation between `begin` and `finish`. One kernel, one 8-word command layout.
 - UTF-8 text (CJK via `Font(path, sizes, fallback=...)`), no shaping; scancodes below 128.
 - Themes: `ui.set_theme(glass()|neon()|flat())`; widgets read theme roles, `button(color=0)` = accent. DPI: `ui.set_scale(win.scale())`, `inp.logical(scale)`.
+- Images: `image_decode(bytes)` takes PNG, JPEG, WebP and AVIF (stills; an animated AVIF's later frames raise), all pure Mojo, RGBA `r | g<<8 | b<<16 | a<<24`.
 - Glass needs the scene: `layer.set_scene(...)` or `blur_from`; without it the backdrop is empty.
 
 ## Large image

@@ -7,6 +7,7 @@ Mojo), RIFF....WEBP is not decoded yet, anything else is `png_decode`. Build wit
 PNG test oracle, tests/jpeg_test.sh the JPEG one.
 """
 from std.ffi import OwnedDLHandle
+from imkit.avifrgb import avif_decode
 from imkit.jpeg import jpeg_decode
 from imkit.webp import webp_decode
 
@@ -78,7 +79,9 @@ def png_decode(d: Span[UInt8, _]) raises -> Tuple[Int, Int, List[UInt32]]:
 
 
 def image_decode(d: Span[UInt8, _]) raises -> Tuple[Int, Int, List[UInt32]]:
-    """(width, height, pixels) of a JPEG or PNG, told apart by signature."""
+    """(width, height, pixels) of a PNG, JPEG, WebP or AVIF, told apart by signature (AVIF: an ISO BMFF `ftyp` box)."""
+    if len(d) >= 12 and d[4] == 0x66 and d[5] == 0x74 and d[6] == 0x79 and d[7] == 0x70:
+        return avif_decode(d)
     if len(d) >= 12 and d[0] == 0x52 and d[1] == 0x49 and d[2] == 0x46 and d[3] == 0x46 and d[8] == 0x57 and d[9] == 0x45 and d[10] == 0x42 and d[11] == 0x50:
         return webp_decode(d)
     if len(d) >= 2 and d[0] == 0xFF and d[1] == 0xD8:

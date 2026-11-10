@@ -24,6 +24,9 @@ widgets append to one flat draw list, one `compose` kernel turns that list into 
 the layer over the app's picture. No Python UI process, no C++ library, no bundled windowing: the system's SDL3 and
 FreeType are called through Mojo's FFI.
 
+It also ships pure-Mojo image decoders behind one call, `image_decode`: PNG, JPEG (bit-identical to libjpeg-turbo), WebP
+(lossless, lossy, alpha) and AVIF stills (YUV equal to dav1d sample for sample, 8 to 12 bit, alpha, superres, film grain).
+
 
 ## Modules
 
@@ -34,9 +37,10 @@ FreeType are called through Mojo's FFI.
 | `imkit.font` | glyph atlas from a TrueType font (ASCII 32-126, a few pixel sizes, alpha8), built once at start |
 | `imkit.draw` | `Draw` (`ui.d`): the command list, tile binning, the `compose` kernel; counters `ui.d.n`, `ui.d.dropped` |
 | `imkit.ui` | `Ui`: `begin(input)`, `panel`, `button`, `icon`, `bar`, `spark`, `text`, `field` (single-line text box), `rect`, `line`, `tri`, `image`, `finish()` |
-| `imkit.atlas`, `imkit.assets` | skyline packer for the glyph atlas; PNG, JPEG and WebP asset atlas (`pack`, `Assets`, `image_decode`, `png_decode`) |
+| `imkit.atlas`, `imkit.assets` | skyline packer for the glyph atlas; PNG, JPEG, WebP and AVIF asset atlas (`pack`, `Assets`, `image_decode`, `png_decode`) |
 | `imkit.jpeg` | pure Mojo JPEG decoder, baseline and progressive (`jpeg_decode`) |
 | `imkit.webp` | pure Mojo WebP decoder: lossless, lossy and alpha (`webp_decode`) |
+| `imkit.avifrgb` | pure Mojo AVIF decoder for still images: 8 to 12 bit, 4:2:0 / 4:2:2 / 4:4:4 / mono, alpha, superres, film grain (`avif_decode`); YUV planes equal to dav1d (`imkit.av1dec.decode_frame`) |
 | `imkit.styles`, `imkit.contrast` | 29 generated themes (`style(name)`, `STYLE_NAMES`) and the WCAG contrast gate every theme passes |
 | `imkit.theme` | `Theme` roles and the presets `glass()`, `neon()`, `flat()`, `amarbaro()`, `amarbaro_light()`; the module constants are the glass values |
 
