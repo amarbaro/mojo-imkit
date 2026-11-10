@@ -10,7 +10,10 @@ jobs:
     # ships ImageMagick 6. The job runs in the same image that scripts were checked against (ci-local . ubuntu:26.04).
     container: ubuntu:26.04
     steps:
-      - run: apt-get update -q && DEBIAN_FRONTEND=noninteractive apt-get install -yq --no-install-recommends curl ca-certificates git build-essential python3 fonts-dejavu-core fonts-noto-cjk libfreetype6 imagemagick libwebp7 libavif-bin dav1d ffmpeg
+      # Up to 3 tries, each with a fresh index (one line: ci-local bakes apt steps into a single RUN), then a check
+      # that the tools exist, since a loop whose tries all failed still ends with status 0: on 2026-11-10 the security index named perl 5.40.1-7ubuntu0.4 while the
+      # pool still answered 404 for its .debs; a later `apt-get update` gets an index that matches the pool.
+      - run: for i in 1 2 3; do apt-get update -q && DEBIAN_FRONTEND=noninteractive apt-get install -yq --no-install-recommends -o Acquire::Retries=3 curl ca-certificates git build-essential python3 fonts-dejavu-core fonts-noto-cjk libfreetype6 imagemagick libwebp7 libavif-bin dav1d ffmpeg && break; echo "apt try $i failed, fresh index in 30 s"; sleep 30; done && command -v magick avifdec dav1d ffmpeg git
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v10.3.0
       - run: scripts/ci.sh
