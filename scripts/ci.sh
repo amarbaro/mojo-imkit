@@ -21,6 +21,15 @@ fi
 [ -n "${IMKIT_FONT:-}" ] || { echo "FAIL setup: no TrueType font found, set IMKIT_FONT"; exit 1; }
 export IMKIT_FONT
 echo "font $IMKIT_FONT"
+# a CJK fallback font for the glyph-fallback checks: IMKIT_CJK, else Arch or Debian/Ubuntu location
+if [ -z "${IMKIT_CJK:-}" ]; then
+  for f in /usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc /usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc; do
+    [ -f "$f" ] && { IMKIT_CJK=$f; break; }
+  done
+fi
+[ -n "${IMKIT_CJK:-}" ] || { echo "FAIL setup: no Noto CJK font found, set IMKIT_CJK"; exit 1; }
+export IMKIT_CJK
+echo "cjk $IMKIT_CJK"
 mkdir -p .work
 M=$MOJO
 $M precompile src/imkit -o .work/imkit.mojoc 2>.work/build.err || { echo "FAIL precompile: src/imkit"; grep error .work/build.err | head -20; exit 1; }

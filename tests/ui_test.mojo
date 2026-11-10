@@ -294,7 +294,7 @@ def main() raises:
         fails += 1
     # UTF-8 + dynamic atlas: 日 is rasterized on the first frame, 語 only during the second (Layer sends the dirty rows); each glyph's
     # pixels on the card are exactly where the host atlas has ink, and a glyph neither font has draws as the '?' glyph
-    var cui = Ui(Font(getenv("IMKIT_FONT", "/usr/share/fonts/TTF/Roboto-Medium.ttf"), [13, 16, 22], "/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc"))
+    var cui = Ui(Font(getenv("IMKIT_FONT", "/usr/share/fonts/TTF/Roboto-Medium.ttf"), [13, 16, 22], getenv("IMKIT_CJK", "/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc")))
     var clayer = Layer(ctx, cui)
     var cjk_ok = True
     var cps = List[Int]()

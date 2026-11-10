@@ -79,7 +79,7 @@ def main() raises:
     if len(cps) != 4 or cps[0] != 97 or cps[1] != 233 or cps[2] != 8364 or cps[3] != 128512 or bad_cp or decode(Span(junk), 1)[0] != 0xFFFD or decode(Span(junk), 2)[0] != 0x41:
         fails += 1
     # dynamic glyphs: Roboto has no CJK, the fallback does; one rasterize per (codepoint, size), rows marked dirty, '?' for a glyph neither has
-    var cjk = "/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc"
+    var cjk = getenv("IMKIT_CJK", "/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc")
     var fb = Font(getenv("IMKIT_FONT", "/usr/share/fonts/TTF/Roboto-Medium.ttf"), [13, 16, 22], cjk)
     var nofb = Font(getenv("IMKIT_FONT", "/usr/share/fonts/TTF/Roboto-Medium.ttf"), [13, 16, 22])
     fb.clean()
