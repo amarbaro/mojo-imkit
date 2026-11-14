@@ -1,0 +1,4 @@
+name = "mojo-imkit"
+version = "0.10.0"
+description = "Immediate-mode GUI for Mojo, composed on the GPU: SDL3 window, FreeType text, widgets as one draw list"
+tags = ["mojo", "gui", "gpu", "ui"]
