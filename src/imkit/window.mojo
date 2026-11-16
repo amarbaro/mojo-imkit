@@ -7,6 +7,7 @@ reached through OwnedDLHandle (no binding, no build flag). Event layouts: SDL 3.
     win.present(Int(out_h.unsafe_ptr()), Int(ui_h.unsafe_ptr()))   # frames in host memory, row-major RGBA
 """
 from std.ffi import OwnedDLHandle, external_call
+from std.os import getenv
 
 comptime EV_QUIT = 0x100
 comptime EV_CLOSE = 0x210
@@ -86,10 +87,15 @@ struct Window(Movable):
     var held: SIMD[DType.uint64, 2]  # keys down now (scancodes < 128): key_down(); press / release events keep it
     var keep: List[List[UInt8]]  # text of push()ed EV_TEXT events, alive until the next poll() has read them
     var scripted: Bool  # True: only push()ed mouse events count (which = SCRIPT_MOUSE); a real mouse is ignored (scripted checks)
+    var frames: Int  # presented so far; IMKIT_SHOT saves frame IMKIT_SHOT_FRAME (default 30) and exits
 
-    def __init__(out self, title: String, w: Int, h: Int, uw: Int = 0, uh: Int = 0) raises:
+    def __init__(out self, title: String, w: Int, h: Int, uw: Int = 0, uh: Int = 0, app_id: String = "") raises:
         self.sdl = OwnedDLHandle("libSDL3.so.0")
-        self.w, self.h, self.x, self.y, self.down, self.scripted = w, h, 0, 0, 0, False
+        self.w, self.h, self.x, self.y, self.down, self.scripted, self.frames = w, h, 0, 0, 0, False, 0
+        # Wayland app id = the .desktop file name, so the compositor shows the app's icon, not its generic one.
+        var id = app_id.copy() if app_id else getenv("IMKIT_APP_ID", String(title.split(" ")[0]).lower())
+        var k, v = String("SDL_APP_ID"), id.copy()
+        _ = self.sdl.get_function[Bool]("SDL_SetHint")(k.as_c_string_span().ptr(), v.as_c_string_span().ptr())
         self.held = SIMD[DType.uint64, 2](0)
         self.ev = List[UInt8](length=128, fill=0)
         self.keep = List[List[UInt8]]()
@@ -188,6 +194,14 @@ struct Window(Movable):
         if ui and self.utex:
             _ = self.sdl.get_function[Bool]("SDL_UpdateTexture")(self.utex, Int(0), ui, Int32(self.uw * 4))
             _ = self.sdl.get_function[Bool]("SDL_RenderTexture")(self.ren, self.utex, Int(0), Int(0))
+        self.frames += 1
+        var shot = getenv("IMKIT_SHOT")
+        if shot and self.frames == Int(getenv("IMKIT_SHOT_FRAME", "30")):  # read back before present, then quit
+            var surf = self.sdl.get_function[Int]("SDL_RenderReadPixels")(self.ren, Int(0))
+            if surf == 0 or not self.sdl.get_function[Bool]("SDL_SaveBMP")(surf, shot.as_c_string_span().ptr()):
+                raise Error("IMKIT_SHOT: could not save " + shot)
+            self.sdl.get_function[NoneType]("SDL_DestroySurface")(surf)
+            external_call["exit", NoneType](Int32(0))
         _ = self.sdl.get_function[Bool]("SDL_RenderPresent")(self.ren)
 
     def push(mut self, kind: Int, a: Int = 0, x: Float32 = 0, y: Float32 = 0, rx: Float32 = 0, ry: Float32 = 0, which: Int = SCRIPT_MOUSE, text: String = "") raises:
