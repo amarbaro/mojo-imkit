@@ -2,6 +2,7 @@
 
 Full notes in `docs/releases/`. Newest first. Format: the release-note template.
 
+- [v0.11.0](docs/releases/v0.11.0.md) (2026-11-16): Wayland app id per window, IMKIT_SHOT frame capture
 - [v0.10.0](docs/releases/v0.10.0.md) (2026-11-10): pure-Mojo AVIF still-image decoder (YUV equal to dav1d on 32 fixtures), image_decode takes AVIF.
 - [v0.9.0](docs/releases/v0.9.0.md) (2026-11-10): pure-Mojo JPEG and WebP decoders, 29 generated themes plus amarbaro, style assets, heading/caption/badge/kv widgets, contrast gate.
 - [v0.8.1](docs/releases/v0.8.1.md) (2026-11-09): 5.6 MB instead of 13.5 MB for a render_into app; nine bug fixes.
