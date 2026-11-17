@@ -9,6 +9,9 @@ from .font import Font
 from .theme import Theme, glass
 from .contrast import contrast
 from .window import Input
+from std.collections import Set
+from std.os import getenv
+from std.sys import stderr
 
 comptime SC_BACKSPACE = 42  # SDL scancode
 
@@ -63,6 +66,10 @@ struct Ui(Movable):
     var cols: List[Float32]  # the table's column edges this frame, from its left (ncols + 1)
     var field_focused: Bool  # a field drawn this frame has focus: the app sends keys to typing, not to shortcuts
     var assets: Assets  # icon_img's pictures: the app sets it and calls Layer.set_assets with it
+    var bounds: Bool  # IMKIT_BOUNDS=1: text() reports a string that ends past the current panel's inner edge, unclipped
+    var px1: Float32  # the current panel's right edge this frame (0: no panel yet)
+    var cx1: Float32  # the current clip's right edge (huge: no clip)
+    var seen: Set[String]  # strings already reported
 
     def __init__(out self, var font: Font):
         self.d = Draw(font^)
@@ -77,6 +84,8 @@ struct Ui(Movable):
         self.cols = List[Float32]()
         self.vp = SIMD[DType.float32, 4](0)
         self.inp = Input(0, 0, 0, 0, 0, 0, 0, 0, SIMD[DType.uint64, 2](0), False)
+        self.bounds, self.px1, self.cx1 = getenv("IMKIT_BOUNDS") != "", 0, 1e9
+        self.seen = Set[String]()
 
     def begin(mut self, inp: Input, dt: Float32 = 0):
         """Start a frame: this frame's input and its length in seconds (0: springs hold still)."""
@@ -85,6 +94,7 @@ struct Ui(Movable):
         self.d.begin()
         self.over = False
         self.field_focused = False
+        self.px1, self.cx1 = 0, 1e9
 
     def set_scale(mut self, scale: Float32):
         """DPI: draw `scale` layer pixels per logical unit. Call before begin(); the font sizes stay in layer pixels, so
@@ -130,9 +140,11 @@ struct Ui(Movable):
     def clip(mut self, x0: Float32, y0: Float32, x1: Float32, y1: Float32):
         var k = self.scale
         self.d.clip(x0 * k, y0 * k, x1 * k, y1 * k)
+        self.cx1 = x1
 
     def unclip(mut self):
         self.d.unclip()
+        self.cx1 = 1e9
 
     def glass(mut self, x0: Float32, y0: Float32, x1: Float32, y1: Float32, r: Float32, tint: UInt32):
         var k = self.scale
@@ -165,7 +177,12 @@ struct Ui(Movable):
     def text(mut self, x: Float32, y: Float32, s: StringSlice, size: Int, c: UInt32) -> Float32:
         """Draw s with its top at y (logical); the origin snaps to a whole layer pixel. Returns the logical x after it."""
         var k = self.scale
-        return self.d.text(round(x * k), round(y * k), s, size, c) / k
+        var end = self.d.text(round(x * k), round(y * k), s, size, c) / k
+        # IMKIT_BOUNDS: a string that runs into the panel's border (4 px inside it) with no clip to stop it
+        if self.bounds and x > 0 and x < self.px1 and end > self.px1 - 4 and self.cx1 > self.px1 - 4 and String(s) not in self.seen:
+            self.seen.add(String(s))
+            print("IMKIT_BOUNDS: '" + String(s) + "' at x " + String(Int(x)) + " ends at " + String(Int(end)) + ", panel edge " + String(Int(self.px1)), file=stderr)
+        return end
 
     def animate(mut self, id: Int, target: Float32) -> Float32:
         """The spring value for widget id moving toward target (first sight: the target itself)."""
@@ -184,6 +201,7 @@ struct Ui(Movable):
     def panel(mut self, x0: Float32, y0: Float32, x1: Float32, y1: Float32, title: StringSlice):
         """Glass panel with a soft shadow and a title; the layout cursor starts under the title."""
         var t = self.theme.copy()
+        self.px1 = x1
         self.rect(x0 + 2, y0 + 6, x1 + 2, y1 + 10, t.radius + 2, t.shadow, t.blur)
         if t.border > 0:
             self.rect(x0 - t.border, y0 - t.border, x1 + t.border, y1 + t.border, t.radius + t.border, t.border_c)

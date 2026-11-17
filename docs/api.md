@@ -63,3 +63,10 @@ Checks: the decoded YUV planes equal avifdec / dav1d sample for sample on 32 fix
 monochrome, lossless and identity (`tests/avif_rgba_test.sh`). Every gate carries mutants that must break it.
 
 `python3 tools/png_fixture.py` writes the test fixtures. `mojo run -I src tools/pack_atlas.mojo assets/atlas assets/src/*.png` packs 8-bit RGB/RGBA PNGs (Blender icons, ComfyUI textures) into `assets/atlas.bin` (RGBA bytes) and `assets/atlas.txt` (`name offset width height`, name = file stem). At run time: `ui.assets = Assets("assets/atlas")`, `layer.set_assets(ui.assets)` once (copies to the image pool from offset 0; a `set_image` picture below `len(assets.px)` makes it raise, so give `set_image` an offset past the atlas), then `ui.icon_img("play", x, y)` each frame (own size, or `w, h` to scale; `alpha`); an unknown name returns False and counts in `ui.d.dropped`.
+
+## Debug switches (environment)
+
+| variable | effect |
+|---|---|
+| `IMKIT_SHOT=FILE` | `Window.present` reads frame `IMKIT_SHOT_FRAME` (default 30) back before presenting, saves it as BMP to FILE and quits: the only way app screenshots are taken |
+| `IMKIT_BOUNDS=1` | `Ui.text` prints `IMKIT_BOUNDS: 'TEXT' at x X ends at E, panel edge P` to stderr, once per string, when a string runs within 4 px of the current panel's right edge and no clip stops it before that edge |
